@@ -24883,15 +24883,28 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/test/kotlin/com/elon/app/ReadingPositionsTest.kt",
-          "content_hash": "6017111624f60bfbb55e549fdbc5c9468da09f8ae51a3e649493ed603a4740f2",
+          "content_hash": "81b60b10e1445f2b4bae87c65b3e14094e36c850b3b587e6846e06faa174b63d",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "e00e38551c1c7fcbe85a7163d01fe9b3060fefae",
-            "state": "index_only"
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "f86ff9f9ac7cad9a0720da2ecb5c0a8ab49d3148",
+            "worktree_blob_oid": "f86ff9f9ac7cad9a0720da2ecb5c0a8ab49d3148",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/social-reading-bookmarks-20261002.md",
+          "content_hash": "e108d3c317bf4a72920f8c7d1260b4f0a4af3ec3e58eea852f31b789830b8777",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "f21f3aa28503b0cf4ab8c226f21f2dc0c2757a72",
+            "worktree_blob_oid": "49c61deb653149d1b1ea9849cc811ea6a9ef0dd4",
+            "state": "tracked_modified"
           }
         },
         {
@@ -24901,10 +24914,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
-            "head_blob_oid": "",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "a4991489fcac6d375a39676443ce24eae3d3b4fe",
             "worktree_blob_oid": "a4991489fcac6d375a39676443ce24eae3d3b4fe",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -24914,10 +24927,23 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
-            "head_blob_oid": "",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "10c21d59a69fae332588a85c4d58d301e9c6ace2",
             "worktree_blob_oid": "10c21d59a69fae332588a85c4d58d301e9c6ace2",
-            "state": "index_only"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-reading-positions.cjs",
+          "content_hash": "6320e2d6b4d4c5ce293f1c297938939bc9a72cf4e0396d43f4daefebee98fc10",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "151166567f4a01997b5a991ed2dc2a847e27039d",
+            "worktree_blob_oid": "151166567f4a01997b5a991ed2dc2a847e27039d",
+            "state": "tracked_clean"
           }
         },
         {
@@ -24927,23 +24953,23 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
-            "head_blob_oid": "",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "c00cdc55831f633ae611ec399a91d45544ec9806",
             "worktree_blob_oid": "c00cdc55831f633ae611ec399a91d45544ec9806",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/store/message_timeline/reading/tests.rs",
-          "content_hash": "946a4f9fb8c9cda79e7c79fec85d56d2f3d99479df45d827a18fac55de9febcc",
+          "content_hash": "317549d59ad7ced476f65c043f3cf071ed0f2019ac1cc72b5b276ebf004b534e",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "ea93af583db211da90bce7b45d6965f098edcca4",
-            "state": "index_only"
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "c7f1a7dccc203b7e268c74563301379e297fe846",
+            "worktree_blob_oid": "c7f1a7dccc203b7e268c74563301379e297fe846",
+            "state": "tracked_clean"
           }
         },
         {
@@ -24953,15 +24979,28 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
-            "head_blob_oid": "",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "977bbaa7718ec7fbd99a5123d8560d2317c2c96f",
             "worktree_blob_oid": "977bbaa7718ec7fbd99a5123d8560d2317c2c96f",
-            "state": "index_only"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store_migrations.rs",
+          "content_hash": "bd6c3fc345f1000a8ee7d809168a7868c88e65e32c0f34cb96b981019014e08c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4e91f2b4f1d3f5fda198b96cc08652fb1edc8116",
+            "head_blob_oid": "7bb657133e6e47cccf97f929c4f1bc5d0583caaf",
+            "worktree_blob_oid": "7bb657133e6e47cccf97f929c4f1bc5d0583caaf",
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1790915508984,
-      "updated_at_ms": 1790926107355
+      "updated_at_ms": 1790932465823
     },
     {
       "id": "social-sync-status-lifecycle-v1",
@@ -33528,16 +33567,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e665f872b71f46aeaa4985a435641205",
-      "feature_id": "pwa-home-screen-startup-v1",
-      "action": "registered",
-      "actor": "codex-pwa-startup",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789877925930
-    },
-    {
       "id": "feature_event_d81e0364767f42d4aebbd95fde7a84f8",
       "feature_id": "pwa-home-screen-startup-v1",
       "action": "claimed",
@@ -35526,6 +35555,16 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790932235105
+    },
+    {
+      "id": "feature_event_ef8101e54c3f4fd8b338ff56ddddbdfc",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790932465824
     }
   ]
 }

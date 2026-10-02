@@ -14,7 +14,7 @@ owner: conversation-platform
 
 - APK 长按消息可添加阅读书签，会话顶部有「阅读书签」；PWA/Win 消息菜单和顶部有入口。
 - 每个书签分别保存固定原始消息和续读位置，可命名、备注、复制、删除及撤销删除。
-- 从「继续阅读」进入才激活对应书签；向前回看可以回退续读位置，原始标记不变。
+- 从书签的「继续阅读」或「回到原始标记」进入后激活对应书签；向前回看可以回退续读位置，原始标记不变。
 - 普通进入仍显示最新消息；普通阅读位置独立。发送或显式回最新成功后结束书签续读。
 - 使用消息身份和消息内比例定位，不用页码或永久像素 offset。默认定位附近 50 条，单页最多 100 条。
 - APK/PWA 窗口最多 150 条/1.5 MB，Win 最多 300 条/3 MB；单条超大消息保留，故字节上限允许单条例外。
@@ -44,9 +44,9 @@ owner: conversation-platform
 
 | 项目 | implementation_status | verification_status | delivery_status | acceptance_status |
 | --- | --- | --- | --- | --- |
-| 私人存储、权限、定位与双向 API | implemented | integration_passed | not_started | pending |
-| PWA/Win 书签与续读 | implemented | integration_passed | not_started | pending |
-| APK 书签与续读 | implemented | offline_passed | not_started | pending |
+| 私人存储、权限、定位与双向 API | implemented | integration_passed | published | upgrade_smoke_passed |
+| PWA/Win 书签与续读 | implemented | integration_passed | published | browser_fixture_passed |
+| APK 书签与续读 | implemented | offline_passed | published | device_partial |
 | 自有 AI/项目页面 UI | not_started | not_run | not_started | pending |
 
 已取得的证据：
@@ -64,6 +64,10 @@ owner: conversation-platform
   新增回归后 APK 合计覆盖 28 项，其中 ReadingPositions 两项复验通过：`bookmarks-android-initial-progress-20261002-155034-473`。
   PWA/Win 浏览器复验分别通过：`bookmarks-browser-baseline-20261002-155903-612`、`bookmarks-win-baseline-20261002-155916-015`。
 - 移动 V2 自测 12 项及规范检查通过；只证明治理合同，不替代设备运行验收。
+- 旧库升级补充回归后，服务端消息时间线/书签 17 项全部通过：`bookmarks-rust-upgrade-20261002-162838-385`；
+  指纹 `853c7db2a21ef2ac5a73b2e1109302ca8763656a88025f04b7cdbc64f45e7bd4`。
+- 实际 non-fast-forward 后合入上游网格分享改动，书签文件无冲突。PWA/Win 浏览器复验通过：
+  `bookmarks-pwa-after-rebase-20261002-165502-073`、`bookmarks-win-after-rebase-20261002-165458-713`。
 
 ## 构建兼容修复
 
@@ -74,5 +78,27 @@ DateTime，避免字符串往返丢失时区而误判 Cargo 源熔断。PS5/PS7 
 
 ## 发布身份与设备
 
-待正式发布后补充提交 SHA、服务端版本、APK 版本/摘要、线上检查及逐台手机结果。
-生产验收仅创建私人临时书签并清理，不发送测试群消息或清空账号数据。
+- 功能提交 `ccdb93313`，首次同步修正 `7134fe07c`，旧库迁移修正 `361c617dcf9be42b2f744f9d2a68d45f38f8de5e`，均已推送主线。
+- 服务端最终 `0.3.1815`；正式发布日志 `bookmarks-server-upgrade-publish-final-20261002-163850-333`。
+  健康、精确源提交和 Win 前端入口检查通过：`bookmarks-final-server-check-20261002-170407-502`、
+  `bookmarks-final-pc-check-20261002-170413-340`。
+- PWA 独立运行时模板经正式静态发布脚本更新，来源同为 `361c617dc`，SHA-256
+  `f1d368eebea995700466e8ec7c0f4db80a0523cdd56df062cf0f51612b1ab6df`；
+  日志 `bookmarks-pwa-final-generation-20261002-165951-482`。只发布后端不会替换线上已有运行时模板，因此单独核对实际 `/web` 页面。
+- 本任务正式发布 APK `1.1.1851` 后，复用发布系统中同一最终提交的 `1.1.1852` 工件；
+  最终 APK SHA-256 `12d73254914e85db53a860b3c063b2b5216f1d0f47a0e9b3f5feb45547ccf908`。
+  完成检查 `bookmarks-final-apk-check-20261002-170858-506` 通过。
+- 小米保留数据更新到 1851，随后已安装正式 1852；ADB 回读版本与安装包 SHA-256 均与线上 1852 完全一致。
+  本任务 1851 的正式装机回执为 `com.elon.app-1851-6f968ff144964309bfe7960bc5ca07bf.json`，荣耀结果 `offline`，未冒充已装机。
+
+### 真机发现与修正
+
+1851 首次验收发现书签入口不显示：建表曾挂在已有 v310 迁移末尾，已执行 v310 的旧库不会重跑。
+现恢复 v310 原职责并新增独立 v311。新增回归模拟已升级到 v310 的 SQLite，调用正式迁移入口两次，
+验证只登记一次 v311、原消息保留、书签能够创建并列出。线上日志确认在 `2026-10-02T09:02:58Z` 执行 v311。
+
+在小米正式 1852 上已确认群聊「阅读书签」入口、长按「添加阅读书签」、名称/备注编辑器和输入焦点。
+随后设备被其他操作切换到 AI/网格页面，已停止输入并请求独占验收时间。
+多书签跳转、滚动更新、退出恢复与旧消息翻页的完整真机流程仍待执行；不能把入口可见当作全部通过。
+待恢复时先检查并清理本任务临时名 `QA-20261002-A`（本次未确认保存成功），再执行 A/B 独立续读及撤销删除。
+本任务没有发送测试群消息或清空账号数据。浏览器运行证据来自真实页面/组件配合合成 API；真实登录浏览器跨设备联动尚未专项验收。
