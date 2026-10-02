@@ -67,7 +67,7 @@ export default function SocialImagePreview({ url, name, onClose, returnFocus }: 
   }
   const finishPointer = (event: React.PointerEvent) => { pointers.current.delete(event.pointerId); snapshot() }
   const scales = image ? imageScales(image, size) : null
-  return createPortal(<dialog ref={dialog} className={styles.dialog} aria-label={`图片预览：${name}`} onCancel={event => { event.preventDefault(); onClose() }} onClose={onClose}
+  return createPortal(<dialog ref={dialog} className={styles.dialog} aria-label={`图片预览：${name}`} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose() }} onClose={onClose}
     onKeyDown={event => {
       if (!image || (event.target as HTMLElement).closest('button,a,input')) return
       if (['+', '=', '-'].includes(event.key)) { event.preventDefault(); zoom(event.key === '-' ? 1 / 1.5 : 1.5) }
