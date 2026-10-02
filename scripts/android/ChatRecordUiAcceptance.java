@@ -42,6 +42,26 @@ public final class ChatRecordUiAcceptance extends UiAutomatorTestCase {
         try { info.performAction(forward ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD : AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD); } finally { info.recycle(); }
         Thread.sleep(250);
     }
+    private void revealForTouch(UiObject card) throws Exception {
+        UiObject list = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/chatList"));
+        UiObject input = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/bottomBarContainer"));
+        for (int attempt = 0; attempt < 4; attempt++) {
+            android.graphics.Rect viewport = list.getBounds();
+            if (input.exists()) viewport.bottom = Math.min(viewport.bottom, input.getBounds().top);
+            android.graphics.Rect bounds = card.getBounds();
+            int margin = Math.max(16, viewport.height() / 12);
+            if (bounds.bottom <= viewport.bottom - margin && bounds.top >= viewport.top) return;
+            // The list extends behind the composer; accessibility existence is not touch visibility.
+            boolean above = bounds.top < viewport.top;
+            int startY = above ? viewport.top + margin : viewport.bottom - margin;
+            int endY = above ? Math.min(viewport.bottom - margin, startY + viewport.height() / 3)
+                : Math.max(viewport.top + margin, startY - viewport.height() / 3);
+            assertTrue("record_reveal_swipe_failed", getUiDevice().swipe(viewport.centerX(), startY, viewport.centerX(), endY, 30));
+            Thread.sleep(350);
+        }
+        android.graphics.Rect bounds = card.getBounds();
+        assertTrue("record_card_occluded", !input.exists() || bounds.bottom < input.getBounds().top);
+    }
     public void testStep() throws Exception {
         assertEquals("record_foreground_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
@@ -51,12 +71,32 @@ public final class ChatRecordUiAcceptance extends UiAutomatorTestCase {
             assertTrue("record_group_required", !group.isEmpty() && group.length() <= 120);
             if (!text(group).exists() && text("群聊").exists()) click(text("群聊"));
             click(text(group));
+        } else if (step.equals("inspect_targets")) {
+            UiObject card = new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("查看聊天记录 ").instance(0));
+            for (int n = 0; !card.exists() && n < 8; n++) scroll(false);
+            for (int n = 0; !card.exists() && n < 16; n++) scroll(true);
+            result.put("card_exists", card.exists());
+            if (card.exists()) {
+                revealForTouch(card);
+                result.put("card_bounds", card.getBounds().toShortString());
+                result.put("list_bounds", new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/chatList")).getBounds().toShortString());
+                UiObject input = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/bottomBarContainer"));
+                if (input.exists()) result.put("input_bounds", input.getBounds().toShortString());
+                org.json.JSONArray targets = new org.json.JSONArray();
+                for (int index = 0; index < 3; index++) {
+                    UiObject child = card.getChild(new UiSelector().className("android.widget.TextView").index(index));
+                    targets.put(new JSONObject().put("index", index).put("exists", child.exists())
+                        .put("clickable", child.isClickable()).put("bounds", child.getBounds().toShortString()));
+                }
+                result.put("targets", targets);
+            }
         } else if (step.equals("open") || step.equals("reopen") || step.startsWith("tap_")) {
             if (step.equals("reopen")) { assertTrue("record_reader_required", ready().exists()); click(desc("返回")); }
             UiObject card = new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("查看聊天记录 ").instance(0));
             for (int n = 0; !card.exists() && n < 8; n++) scroll(false);
             for (int n = 0; !card.exists() && n < 16; n++) scroll(true);
             assertTrue("record_card_missing", card.exists());
+            if (step.startsWith("tap_")) revealForTouch(card);
             long started = SystemClock.elapsedRealtime();
             if (step.startsWith("tap_")) {
                 int index = step.equals("tap_title") ? 0 : step.equals("tap_summary") ? 1 : step.equals("tap_footer") ? 2 : -1;
