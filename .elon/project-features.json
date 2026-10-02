@@ -6074,18 +6074,18 @@
       "id": "binance-grid-group-share-v1",
       "title": "币安网格群聊分享卡片",
       "summary": "三端公开金融字段的不可变网格快照，APK 与移动 PWA 具备本地图标、盈亏色和只读详情，兼容旧隐藏分享。",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/binance-grid-group-share-v1.md",
-        "content_hash": "4b652f1a66b449af9ee0fc27d611f0c9efe4c8b0c62e50b86258536e771154c1",
+        "content_hash": "4dc4f59252220d03399c13c19af14367f67d46b228ac197a6da2d5fc4e19b217",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-          "head_blob_oid": "f534e86f349814c03c59948c4d9b96f460987fa5",
-          "worktree_blob_oid": "f033b354daa113ecd6653bf9a7d92a59945d43c9",
+          "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+          "head_blob_oid": "f033b354daa113ecd6653bf9a7d92a59945d43c9",
+          "worktree_blob_oid": "ba24d015982874374fd68e23d6f18b1118cef3b4",
           "state": "tracked_modified"
         }
       },
@@ -6094,231 +6094,212 @@
       "tags": [],
       "task_paths": [
         "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
-        "android/app/src/main/kotlin/com/elon/app/MainAiConversationShareFeature.kt",
-        "android/app/src/main/kotlin/com/elon/app/MainAttachmentPanelActions.kt",
         "android/app/src/main/kotlin/com/elon/app/grid/share",
-        "pc-frontend/src/features/friends/SocialComposer.tsx",
-        "pc-frontend/src/features/friends/SocialConversation.tsx",
-        "pc-frontend/src/features/grid-share",
+        "android/app/src/main/kotlin/com/elon/app/socialquotes",
+        "android/app/src/test/kotlin/com/elon/app/grid/share",
+        "docs/reports/grid-share-message-layout-20261002.md",
+        "scripts/pwa-attachment-fixture.cjs",
+        "scripts/test-grid-share-message-pwa.cjs",
         "scripts/test-grid-share-pwa.cjs",
+        "scripts/test-pwa-message-actions.cjs",
         "server/src/assets/grid_share.css",
         "server/src/assets/grid_share.js",
-        "server/src/assets/grid_share_view.js",
-        "server/src/router/social_routes/grid_share_assets.rs",
-        "server/src/store/articles/snapshots",
-        "server/src/store/group_web_ai_selection.rs"
+        "server/src/assets/social_chat_view.js",
+        "server/src/assets/social_message_actions.js"
       ],
       "dependencies": [],
       "acceptance_criteria": [
-        "新分享公开金额数量、保留精度和未知语义，私有身份凭证排除",
-        "Win、APK 和移动 PWA 的代币图标、盈亏色、公开金额与只读分区详情语义一致",
-        "跨群与非成员拒绝，幂等发送和不可变版本更新"
+        "新分享完整公开金额数量，兼容旧快照并排除身份凭证",
+        "APK/PWA 在真实收发消息行、窄窗口和大字体下无横向裁切",
+        "网格支持通用长按菜单、语义引用摘要、原消息定位和多选，滚动不误触",
+        "鉴权、跨群、撤回、幂等和不可变版本保持兼容"
       ],
       "implementation_evidence": [
         {
-          "path": "android/app/src/main/kotlin/com/elon/app/grid/share/GridShareFeature.kt",
-          "content_hash": "49baff4b3d5496fa0447d224de3436600b348579a29665fc638cdb77d7af91cc",
+          "path": "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
+          "content_hash": "0cf598decad0d5314c2c86256ccdae0c2cb3e9007d5041b78eec836feb58b14d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
-            "worktree_blob_oid": "10ae7a52ab4cd028d55f310ab3620210e044d6e2",
-            "state": "tracked_modified"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "d65e699ecec9ad9c1ca300fab00e6fbf8594bfec",
+            "worktree_blob_oid": "d65e699ecec9ad9c1ca300fab00e6fbf8594bfec",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/share/GridShareMessageCard.kt",
+          "content_hash": "0c3859f9a38a5455ffe88ac257c3a1bdccdcc61afe00411cd9fa2f40e1f5a4ac",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "017085e671549fc5324e12247db6e4f9249ccba7",
+            "worktree_blob_oid": "017085e671549fc5324e12247db6e4f9249ccba7",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/share/GridShareModel.kt",
-          "content_hash": "7fc4544f44a85c774ac20e1b5aa6c5adc3eedd8386e1ba0527b2356ecba2fe40",
+          "content_hash": "8ee2c858dcc173da17f2248073b9cd8b38a1b442951cdae63ac50f4b2ab03496",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "ee04964db2ea6706a880a6114199258c46d064f8",
-            "worktree_blob_oid": "dcf99ac41f1c1f30ddd6d3389ec0f3f116988b6b",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "android/app/src/main/kotlin/com/elon/app/grid/share/GridSharePreview.kt",
-          "content_hash": "c96d3449572635a415f8132605007b3f2dbdb3dc65d662203dfb6f341d9157e6",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "c20b62aec1cb1990cfc379c994db415eac677b19",
-            "worktree_blob_oid": "5132a7041593ef8087e99087eff7aed9517bc1bf",
-            "state": "tracked_modified"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "0698a505ff36e8b0796e5c4b1ffeebe310d89c9b",
+            "worktree_blob_oid": "0698a505ff36e8b0796e5c4b1ffeebe310d89c9b",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/share/GridShareViews.kt",
-          "content_hash": "e1683a8654f821da6a27f897d77682dbda263975977c519e1b61c70b3f617d99",
+          "content_hash": "13d43b4afa84c2c9cd0a97631542e5cedfaeee94bc6b7c81126338de1daebca1",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "60ce50c675042cbf710fe8b2c5785a8f85da2572",
-            "worktree_blob_oid": "fada65257e2f336d85ca770857dee583343839f7",
-            "state": "tracked_modified"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "9ac5f6570b0aa38b30cdc2f6ef04057026c4e2de",
+            "worktree_blob_oid": "9ac5f6570b0aa38b30cdc2f6ef04057026c4e2de",
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "android/app/src/test/kotlin/com/elon/app/grid/share/GridShareModelTest.kt",
-          "content_hash": "f18db58128192b9fb156bef09ef0cd627151e010760028112dcff13891bc93f5",
+          "path": "android/app/src/main/kotlin/com/elon/app/socialquotes/SocialQuote.kt",
+          "content_hash": "bf962c7ecd428bf122b70ba1490a1e4cc59d3b2d3f3cddad546744a421708909",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "60d92eff00be351ef28828297c9a5ad61ba1634f",
+            "worktree_blob_oid": "60d92eff00be351ef28828297c9a5ad61ba1634f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/share/GridShareMessageTest.kt",
+          "content_hash": "5fbbb2029bcebcd9f88facd87c6ddf0cc432f4b228d648b9d1085ad16e268fa7",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
-            "worktree_blob_oid": "009035ad381a59246f889283a28d61e65c0bcfb1",
-            "state": "tracked_modified"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "303e02d84cc9b14cef694d831d31030eef2650f9",
+            "worktree_blob_oid": "303e02d84cc9b14cef694d831d31030eef2650f9",
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "android/app/src/test/kotlin/com/elon/app/grid/share/GridShareViewsTest.kt",
-          "content_hash": "2752ddef4ddccbd141aab47381da90617fe908954ebcb9726a111534bd0c2a77",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a8154ddc020f5f2c04b30eaef5937ab5a13e676e",
-            "state": "index_only"
-          }
-        },
-        {
-          "path": "docs/reports/grid-share-mobile-public-20261001.md",
-          "content_hash": "738556b84521424d04789d7d117ddf32a9c7bf439c29e9d5e7a83c7096166ac5",
+          "path": "docs/reports/grid-share-message-layout-20261002.md",
+          "content_hash": "3905107c61d551078e2b3481f6a4057a127c2eabefb941ba181ce7d1923b6144",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
             "head_blob_oid": "",
-            "worktree_blob_oid": "736ba5be6a399fbf2ad1fa8d4a111b747109333a",
+            "worktree_blob_oid": "650cd0b37f9a52d9344f6af8e7cb4d84b91ed731",
             "state": "index_only"
           }
         },
         {
-          "path": "pc-frontend/scripts/test-grid-share.cjs",
-          "content_hash": "385d98db8c18067c1e7150024228a0e58b55305a99fe263239e4f1cb6d1f8ae6",
+          "path": "scripts/pwa-attachment-fixture.cjs",
+          "content_hash": "5c4b1eae86388f7be7eb05ad75c051bf390391668a1104a3fd50044394448bec",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
-            "worktree_blob_oid": "802a6c78d1aa57e291a8c92caf2d01fb36046ac5",
-            "state": "tracked_modified"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "6bf304e7024f7ee405fefdbaf2d76780acf5efb8",
+            "worktree_blob_oid": "6bf304e7024f7ee405fefdbaf2d76780acf5efb8",
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "pc-frontend/src/features/grid-share/GridShareComposer.tsx",
-          "content_hash": "8f396e242871300851f432c876be90d9e1bbab648daf273fb41921c38f01905c",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "a2b734f4ab58d34723b6e19538671a473d31172b",
-            "worktree_blob_oid": "c41d109110805807efc93d8e26c8c47fa37c4ce7",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "pc-frontend/src/features/grid-share/gridShareModel.ts",
-          "content_hash": "15fd8c1e78a811eb444710f16c4f6f5b8171d2e8e3f82bf614f48303ce8e9dbd",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "f81f12403403b6fc783c8b4eca776841ab0d5fe1",
-            "worktree_blob_oid": "6b3bf5113127032b539601b30bf6ea1126593704",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "scripts/test-grid-share-pwa.cjs",
-          "content_hash": "5ad2f768dd5a1f84277bce7135173dd5a263b3c6f7fd8c03b190c2afa3363099",
+          "path": "scripts/test-grid-share-message-pwa.cjs",
+          "content_hash": "68a43e4657b71ac4c86144e33bdb93b8d8a8192056b92bec93bf9f62850f7427",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a64db716bb15cfc9117dcadee158aa665a8cee88",
-            "state": "index_only"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "7b6187fb802418788f9569c7f8d037d3935cd57b",
+            "worktree_blob_oid": "7b6187fb802418788f9569c7f8d037d3935cd57b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-pwa-message-actions.cjs",
+          "content_hash": "08ac0c5f91f498352ee856a289ac259aba6cd703ad8c49470a7f11c49533e85d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "ba86bd3dd30a48869bac2b3a569c59a3df9c99f7",
+            "worktree_blob_oid": "ba86bd3dd30a48869bac2b3a569c59a3df9c99f7",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/assets/grid_share.css",
-          "content_hash": "a8101d72a5614256b02d3e906bc5b576c905ebbe1b3fce26b5fb67715ec087b4",
+          "content_hash": "543779a5f60ba8249a75206f4c9fcf28b7a7c8e4c27e2696c0acd4bc161f7ede",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "dc96c0639be10416497bae21f419695f9639c884",
-            "state": "index_only"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "a76bb7d23a776d2b7bf0fb8b7a78b68b8e8862b2",
+            "worktree_blob_oid": "a76bb7d23a776d2b7bf0fb8b7a78b68b8e8862b2",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/assets/grid_share.js",
-          "content_hash": "c6f4a9fa8919d65842fa025785f1e629dc4942482164d4720e218e1ae4246461",
+          "content_hash": "5bd52b02de98f3db9ad30b8dd8e6f444528bfc6423fb96ced42a56dc8f3c22aa",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "5f5c09250320c98c7cb79f277706f364c5187f57",
-            "worktree_blob_oid": "61843212d7655023b63cbd9205bd555ede934aeb",
-            "state": "tracked_modified"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "a284aec7aa71c3f38de420d450b51e167fa6f82e",
+            "worktree_blob_oid": "a284aec7aa71c3f38de420d450b51e167fa6f82e",
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/assets/grid_share_view.js",
-          "content_hash": "6c4b5ac903c77e4745f1a363c56b1ac8789d7e02695cb5db838a4ac570d1c7f5",
+          "path": "server/src/assets/social_chat_view.js",
+          "content_hash": "525478af63767d16ff59ae85b5c2bab573df4ecfb7a0c79daeaafda88c7740ff",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "87ea235e2fabc416e5a3c658f8085dd02879bd2d",
-            "state": "index_only"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "e4655c38574329dfd0879c48c0aec6314413b693",
+            "worktree_blob_oid": "e4655c38574329dfd0879c48c0aec6314413b693",
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "server/src/router/social_routes/grid_share_assets.rs",
-          "content_hash": "9f1bc4c2b50ec7d3c5644cb22aeda7d213073c3c379c7c2c34816be5785a7c1f",
+          "path": "server/src/assets/social_message_actions.js",
+          "content_hash": "9107be1c5d3f26f4ba269578712157ca0fdd6dcb50766a8d4fbf1f4b07588424",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "b69728353189383dfe784adc45e62a620a9001dc",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "aacb7b201b9c703cbbd570cef320d090b031e053",
-            "state": "index_only"
+            "head_commit": "9ead5b34f5f80bfcff1fc7ea66f34e63d4fbcc88",
+            "head_blob_oid": "3e587b743229b852f90870db5fa4597068d5a1e4",
+            "worktree_blob_oid": "3e587b743229b852f90870db5fa4597068d5a1e4",
+            "state": "tracked_clean"
           }
         }
       ],
-      "claim": {
-        "claim_id": "claim_e0a1a692b653454dbc10e6a0d0439372",
-        "agent_id": "grid-share",
-        "claimed_at_ms": 1790867626847,
-        "expires_at_ms": 1790889226847
-      },
       "created_at_ms": 1790847734398,
-      "updated_at_ms": 1790867633028
+      "updated_at_ms": 1790911556634
     },
     {
       "id": "binance-grid-observer-v1",
@@ -33177,96 +33158,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a77d75a5a02544db8c5b5537fbddc907",
-      "feature_id": "binance-grid-rich-reports-v2",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "注册表冲突保留上游，再经官方工具恢复本批独立功能",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789543159629
-    },
-    {
-      "id": "feature_event_ba3c35e98e604b6a9ed37fef6b1d5aa9",
-      "feature_id": "binance-grid-rich-reports-v2",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789543161034
-    },
-    {
-      "id": "feature_event_6bf06f6a41b44c368a53976b85b68b9f",
-      "feature_id": "binance-grid-rich-reports-v2",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789543660149
-    },
-    {
-      "id": "feature_event_1dfb69418ae34bd9a39038fe946aff3e",
-      "feature_id": "binance-grid-rich-reports-v2",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "197项原生、23项报告回归通过，主1774与量化0.7.77已发布安装，用户真实数据验收待补",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789543660206
-    },
-    {
-      "id": "feature_event_59b64a44ea8b47aea71e850d2b126b40",
-      "feature_id": "wechat-article-card-repair-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789544891468
-    },
-    {
-      "id": "feature_event_fd78f715e55540ba84d06e5a0e90f860",
-      "feature_id": "wechat-article-card-repair-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789544891519
-    },
-    {
-      "id": "feature_event_06351211bcfd46c09fed0b47fc5c31f3",
-      "feature_id": "wechat-article-card-repair-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789544924140
-    },
-    {
-      "id": "feature_event_acd4adf00d3a431faeefc196aa9c3768",
-      "feature_id": "wechat-article-card-repair-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789546768939
-    },
-    {
-      "id": "feature_event_d22b8515117a4666b62a6e9fcdec4d2e",
-      "feature_id": "wechat-article-card-repair-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Android 13 项定向测试、PWA 实际浏览器固定样例点击截图、PC 正式构建通过；正式发布继续，真实设备视觉验收延期，不宣称全平台验收。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789546802371
-    },
-    {
       "id": "feature_event_42589e123e6d40d886f8994028855539",
       "feature_id": "wechat-article-card-repair-v1",
       "action": "evidence_recorded",
@@ -35175,6 +35066,96 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1790911198949
+    },
+    {
+      "id": "feature_event_fc449cdec9df4c048e66562a1efcd395",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "claim_released",
+      "actor": "grid-share",
+      "reason": "rebase 保留上游注册表，重新通过工作流记录本轮网格修复",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1790911548109
+    },
+    {
+      "id": "feature_event_dc8bf72471f844918fd76a3d7098414b",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "requirement_rebound",
+      "actor": "grid-share",
+      "reason": "用户反馈真实群聊卡片裁切和长按引用缺失，补充消息行验收条件",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1790911549761
+    },
+    {
+      "id": "feature_event_cc86ca48ba3c493eb8a8b8a0e76e0739",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "metadata_updated",
+      "actor": "grid-share",
+      "reason": "消息操作回归使用新分页协议，补齐测试替身与交付证据路径",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1790911549851
+    },
+    {
+      "id": "feature_event_cd34335824dd4011928c80b6832e1484",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "用户明确要求修复卡片显示和完善引用交互",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1790911549966
+    },
+    {
+      "id": "feature_event_9955fd1baab642448f96e26e6d08b6f8",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "复用现有消息动作和结构化引用协议，边界已核对",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1790911550061
+    },
+    {
+      "id": "feature_event_2e13d6a1dc04465c9098a51c6bb36158",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "claimed",
+      "actor": "grid-share",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790911550161
+    },
+    {
+      "id": "feature_event_d5da5e2d839a4c58b7369915dc771f2f",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "实现真实消息容器宽度约束和引用交互回归",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790911550276
+    },
+    {
+      "id": "feature_event_559b668d986c4460947abff315cb0243",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "evidence_recorded",
+      "actor": "grid-share",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790911556514
+    },
+    {
+      "id": "feature_event_c71549dd40574f4fb23054cb6f7e0163",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "实际消息行宽度、长按及引用已实现，原生23项和PWA布局/交互回归通过；真机Renderer无可用设备，保留验收缺口",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790911556634
     }
   ]
 }
