@@ -7,7 +7,7 @@ reviewed_at: 2026-09-28
 
 `capability_id: social_wechat_record_reader_cache_v1`
 
-Android 的逐次网络等待策略已由 [2026-09-29 二次打开优化](wechat-record-cache-reopen-20260929.md) 替代；下文保留本批次历史验证，PC/PWA 每次复核规则不变。
+Android 的逐次网络等待策略已由 [2026-09-29 二次打开优化](wechat-record-cache-reopen-20260929.md) 替代；PC 附件逐次等待已由 [2026-10-03 本地缓存](win-record-media-cache-20261003.md) 替代，正文仍每次复核。下文保留本批次历史验证，PWA 规则不变。
 
 ## 根因与改动
 

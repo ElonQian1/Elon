@@ -14,7 +14,7 @@ export function recordCard(content: string): RecordCard | null {
       && typeof r.title === 'string' && typeof r.summary === 'string' && Number.isSafeInteger(r.message_count) && r.message_count > 0 && r.message_count <= 2000 ? r : null
   } catch { return null }
 }
-export function recordPath(card: RecordCard): string { return `/api/me/groups/${encodeURIComponent(card.group_id)}/chat-records/${encodeURIComponent(card.record_id)}` }
+export function recordPath(card: Pick<RecordCard, 'group_id' | 'record_id'>): string { return `/api/me/groups/${encodeURIComponent(card.group_id)}/chat-records/${encodeURIComponent(card.record_id)}` }
 export async function recordRequest(path: string, signal: AbortSignal, binary = false, method = 'GET'): Promise<unknown> {
   const token = getAuthToken()
   if (!token) throw Error('请先登录')

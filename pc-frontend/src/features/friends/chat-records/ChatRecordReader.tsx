@@ -7,6 +7,7 @@ import { useRecordWindow } from './useRecordWindow'
 import { useReaderTabs } from '../../reader/readerTabsStore'
 import RecordAsset from './RecordAsset'
 import RecordMessage from './RecordMessage'
+import { clearRecordMedia } from './recordMediaLoader'
 
 export default function ChatRecordReader({ card, onClose }: { card: RecordCard; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), feed = useRef<HTMLDivElement>(null)
@@ -19,21 +20,23 @@ export default function ChatRecordReader({ card, onClose }: { card: RecordCard; 
   const [parent, setParent] = useState<string | null>(null), [view, setView] = useState<RecordView>()
   const [error, setError] = useState(''), [retry, setRetry] = useState(0), [raw, setRaw] = useState(false), [confirmRevoke, setConfirmRevoke] = useState(false)
   const token = useAuthStore(s => s.token), owner = useAuthStore(s => s.user?.id)
+  const { group_id, record_id } = card
   const initialOwner = useRef(owner)
   useEffect(() => { if (owner !== initialOwner.current) onClose() }, [owner, onClose])
   useEffect(() => { dialog.current?.showModal() }, [])
   useEffect(() => {
     const controller = new AbortController(); setView(undefined); setError('')
-    recordRequest(recordPath(card), controller.signal).then(v => { if (!controller.signal.aborted) setView(v as RecordView) })
-      .catch(e => { if (!controller.signal.aborted) setError(e.message || '读取失败') })
+    const identity = { group_id, record_id }
+    recordRequest(recordPath(identity), controller.signal).then(v => { if (!controller.signal.aborted) setView(v as RecordView) })
+      .catch(e => { if (!controller.signal.aborted) { void clearRecordMedia(identity, owner); setError(e.message || '读取失败') } })
     return () => controller.abort()
-  }, [card.record_id, card.group_id, retry, token])
+  }, [record_id, group_id, retry, token, owner])
   useEffect(() => { if (feed.current) feed.current.scrollTop = offsets.current.get(parent || '') || 0 }, [parent])
   function move(id: string | null) { offsets.current.set(parent || '', feed.current?.scrollTop || 0); setParent(id); setRaw(false) }
   function back() { if (raw) setRaw(false); else if (parent) move(view?.document.messages.find(m => m.id === parent)?.parent_id || null); else onClose() }
   async function revoke() {
     const controller = new AbortController()
-    try { await recordRequest(recordPath(card), controller.signal, false, 'DELETE'); setView(undefined); setError('聊天记录已撤回'); setConfirmRevoke(false) }
+    try { await recordRequest(recordPath(card), controller.signal, false, 'DELETE'); await clearRecordMedia(card, owner); setView(undefined); setError('聊天记录已撤回'); setConfirmRevoke(false) }
     catch (e) { setError(e instanceof Error ? e.message : '撤回失败') }
   }
   const messages = view?.document.messages.filter(m => m.parent_id === parent) || []
@@ -41,6 +44,7 @@ export default function ChatRecordReader({ card, onClose }: { card: RecordCard; 
     <header data-record-drag title="拖动窗口，双击居中"><button onClick={back} title="返回" aria-label="返回"><ArrowLeft size={22} /></button><h2>{parent ? '转发的聊天记录' : view?.document.title || card.title}</h2><button onClick={onClose} title="关闭" aria-label="关闭"><X size={22} /></button></header>
     <nav><span>微信导出 · {messages.length} 条</span><details className={styles.options}><summary aria-label="更多"><MoreVertical size={20} /></summary>
       <button onClick={e => { e.currentTarget.closest('details')?.removeAttribute('open'); setRaw(v => !v) }}>{raw ? '返回记录' : '原始文本'}</button>
+      <button onClick={e => { e.currentTarget.closest('details')?.removeAttribute('open'); void clearRecordMedia(card, owner).then(() => setRetry(v => v + 1)) }}>清理本条记录的附件缓存</button>
       {view && view.owner_id === owner && <button onClick={e => { e.currentTarget.closest('details')?.removeAttribute('open'); setConfirmRevoke(v => !v) }}>撤回分享</button>}</details></nav>
     {confirmRevoke && <p className={styles.notice}>撤回后群成员将不能读取此记录。<button onClick={() => void revoke()}>确认撤回</button><button onClick={() => setConfirmRevoke(false)}>取消</button></p>}
     {error && <p className={styles.notice} role="alert">{error}<button onClick={() => setRetry(v => v + 1)}>重试</button></p>}

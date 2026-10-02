@@ -12,13 +12,14 @@ const rows = [
   ['article', 'link', '[链接] 合成预览标题 https://mp.weixin.qq.com/s/fixture-article', null],
   ['channels', 'channels', '[视频号] 视频描述 https://weixin.qq.com/sph/fixture', null],
   ['image', 'image', '[图片]', 'image_test'],
+  ['image2', 'image', '[图片]', 'image_second'],
   ['video', 'video', '[视频]', 'video_test'],
   ['forward', 'forward', '[聊天记录]', null],
 ].map(([id, kind, text, asset_id]) => ({ id, kind, text, asset_id, parent_id: null, sender: '示例用户', time: '2026-09-28 12:00', filename: asset_id ? id : '' }));
 rows.push({ ...rows[0], id: 'nested', parent_id: 'forward', text: '嵌套的聊天消息' });
 const card = { schema: 'chat_record_bundle_v1', record_id: 'record_test', group_id: 'group_test', title: '微信聊天记录', summary: '示例', message_count: 6, total_count: 7 };
 const view = { card, owner_id: 'author', document: { title: card.title, raw_text: 'Original text', warnings: [], messages: rows } };
-let counts = {}, revoked = false, video = Buffer.alloc(0), sent = [];
+let counts = {}, revoked = false, video = Buffer.alloc(0), sent = [], persistentOnly = false;
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/api/me/groups') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ groups: [{ id: 'target', name: '验收群' }] })); return; }
@@ -31,8 +32,9 @@ const server = http.createServer(async (req, res) => {
     const key = url.pathname.split('/').at(-1), tag = `"fixture-${key}-1"`;
     const hit = req.headers['if-none-match'] === tag;
     counts[`${key}:${hit ? 304 : 200}`] = (counts[`${key}:${hit ? 304 : 200}`] || 0) + 1;
-    const bytes = key === 'image_test' ? image : key === 'video_test' ? video : Buffer.from(JSON.stringify(view));
-    res.writeHead(hit ? 304 : 200, { ETag: tag, Vary: 'Authorization', 'Cache-Control': 'private, no-cache', 'Content-Type': key === 'image_test' ? 'image/png' : key === 'video_test' ? 'video/webm' : 'application/json' });
+    const isImage = key.startsWith('image_'), isMedia = isImage || key === 'video_test';
+    const bytes = isImage ? image : key === 'video_test' ? video : Buffer.from(JSON.stringify(view));
+    res.writeHead(hit ? 304 : 200, { ETag: tag, Vary: 'Authorization', 'Cache-Control': persistentOnly && isMedia ? 'private, no-store' : 'private, no-cache', 'Content-Type': isImage ? 'image/png' : key === 'video_test' ? 'video/webm' : 'application/json' });
     res.end(hit ? undefined : bytes); return;
   }
   if (url.pathname === '/api/me/link-preview') {
@@ -79,6 +81,7 @@ const server = http.createServer(async (req, res) => {
     fs.writeFileSync(path.join(output, 'record-preview.webm'), video);
     for (const kind of ['pc', 'pwa']) for (const width of [1280, 390]) {
       counts = {}; revoked = false; sent = [];
+      persistentOnly = kind === 'pc';
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage(); const errors = [];
       page.on('pageerror', e => errors.push(e.message));
@@ -122,8 +125,8 @@ const server = http.createServer(async (req, res) => {
         await title.dblclick(); assert.ok(Math.abs((await dialog.boundingBox()).x - before.x) < 2);
       }
       async function media() {
-        await dialog.locator('.chat-record-asset').first().scrollIntoViewIfNeeded();
-        await page.waitForFunction(() => [...document.querySelectorAll('article img')].some(i => i.naturalWidth === 1));
+        for (let index = 0; index < 2; index++) await dialog.locator('.chat-record-asset').nth(index).scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => [...document.querySelectorAll('article img')].filter(i => i.naturalWidth === 1).length === 2);
         await dialog.locator('.chat-record-video-frame').scrollIntoViewIfNeeded();
         await page.waitForFunction(() => document.querySelector('.chat-record-video-frame img')?.naturalWidth > 1);
         assert.equal(await dialog.locator('video').count(), 0, 'No autoplaying video before explicit play');
@@ -140,13 +143,56 @@ const server = http.createServer(async (req, res) => {
       await dialog.getByRole('button', { name: '关闭', exact: true }).click();
       await page.getByRole('button', { name: '打开测试记录', exact: true }).click(); await media();
       assert.equal(counts['record_test:200'], 1); assert.equal(counts['image_test:200'], 1); assert.equal(counts['video_test:200'], 1);
-      assert.ok(counts['record_test:304'] >= 1); assert.ok(counts['image_test:304'] >= 1); assert.ok(counts['video_test:304'] >= 1);
+      assert.ok(counts['record_test:304'] >= 1);
+      if (kind === 'pc') {
+        assert.equal(counts['image_test:304'] || 0, 0, 'reopening authorized records must reuse the local image');
+        assert.equal(counts['image_second:200'], 1);
+        assert.equal(counts['video_test:304'] || 0, 0, 'reopening authorized records must reuse the local video');
+        const beforeReload = JSON.stringify(counts);
+        await page.reload(); await page.getByRole('button', { name: '打开测试记录', exact: true }).click(); await media();
+        for (const key of ['image_test', 'image_second', 'video_test']) assert.equal(counts[key + ':200'], 1, `${key}: page reload must use IndexedDB, not HTTP cache`);
+        assert.notEqual(JSON.stringify(counts), beforeReload, 'the record document must still be authorized after reload');
+        // Parent refreshes with equivalent card objects must not rebuild visible media.
+        const unchanged = await page.evaluate(async c => {
+          const ReactModule = await import('/pc/node_modules/.vite/deps/react.js'), React = ReactModule.default || ReactModule;
+          const client = await import('/pc/node_modules/.vite/deps/react-dom_client.js'), { createRoot } = client.default || client;
+          const { default: Asset } = await import('/pc/src/features/friends/chat-records/RecordAsset.tsx');
+          const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+          const row = { id: 'same', asset_id: 'image_test', filename: 'image', kind: 'image' };
+          const render = () => root.render(React.createElement(Asset, { row: { ...row }, card: { ...c } }));
+          render(); await new Promise(r => setTimeout(r, 50)); const frame = host.querySelector('.chat-record-media-frame');
+          render(); await new Promise(r => setTimeout(r, 50)); const same = frame === host.querySelector('.chat-record-media-frame');
+          root.unmount(); host.remove(); return !!frame && same;
+        }, card);
+        assert.equal(unchanged, true, 'equivalent card refresh must preserve the media surface');
+        await dialog.getByLabel('更多', { exact: true }).click();
+        const refreshed = page.waitForResponse(response => response.url().endsWith('/chat-records/record_test'));
+        await dialog.getByRole('button', { name: '清理本条记录的附件缓存', exact: true }).click(); await refreshed; await media();
+        for (const key of ['image_test', 'image_second', 'video_test']) assert.equal(counts[key + ':200'], 2, 'explicit clear downloads a fresh copy');
+      } else { assert.ok(counts['image_test:304'] >= 1); assert.ok(counts['video_test:304'] >= 1); }
       assert.equal(await dialog.evaluate(n => n.scrollWidth <= n.clientWidth + 1), true);
       await channels.scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(output, `${kind}-${width}.png`) });
       await dialog.getByRole('button', { name: '关闭', exact: true }).click(); revoked = true;
       await page.getByRole('button', { name: '打开测试记录', exact: true }).click();
       await dialog.getByText('记录已撤回，或你已不在此群聊中').waitFor();
       assert.equal(await dialog.locator('article').count(), 0); assert.deepEqual(errors, []);
+      if (kind === 'pc') {
+        await page.evaluate(async () => {
+          const { RecordMediaCache } = await import('/pc/src/features/friends/chat-records/recordMediaCache.ts');
+          let now = 100;
+          const policy = { database: 'record-cache-policy-test', memoryBytes: 0, diskBytes: 8, maxEntries: 2, maxAge: 20, now: () => now };
+          const cache = new RecordMediaCache(policy), bytes = new Blob(['1234'], { type: 'image/png' });
+          await cache.put('one|a', bytes); now++; await cache.put('one|b', bytes); now++; await cache.put('two|c', bytes);
+          if (await cache.get('one|a')) throw Error('disk LRU did not evict');
+          const cold = new RecordMediaCache(policy);
+          if ((await cold.get('one|b'))?.size !== 4) throw Error('disk persistence missing');
+          await cache.clear('one|');
+          if (await cold.get('one|b')) throw Error('scope invalidation missing');
+          if ((await cold.get('two|c'))?.size !== 4) throw Error('unrelated account removed');
+          now = 130;
+          if (await cold.get('two|c')) throw Error('disk expiry ignored');
+        });
+      }
       // Preserve an explicit play click while the visible attachment is still downloading.
       await page.evaluate(async bytes => {
         const host = document.createElement('div'); document.body.append(host);
@@ -159,7 +205,7 @@ const server = http.createServer(async (req, res) => {
         const played = !!host.querySelector('video'); dispose(); host.remove();
         if (!played) throw Error('Play click was lost during download');
       }, [...video]);
-      console.log(`RECORD_CACHE_UI=passed ${kind} ${width} real-http-304/image/video/nesting/reopen/revoke/cards/drag`);
+      console.log(`RECORD_CACHE_UI=passed ${kind} ${width} real-http/document-auth/two-images/video/nesting/reopen/revoke/cards/drag${kind === 'pc' ? '/indexeddb-reload/stable-rerender/manual-clear' : ''}`);
       await context.close();
     }
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

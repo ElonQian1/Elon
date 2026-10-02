@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { recordPath, recordRequest, type RecordCard, type RecordRow } from './recordApi'
+import { recordPath, type RecordCard, type RecordRow } from './recordApi'
+import { loadRecordMedia } from './recordMediaLoader'
 import { getAuthToken } from '../../../api/client'
 import { resolveApiUrl } from '../../../api/runtime'
 import { useAuthStore } from '../../../store/auth'
@@ -13,15 +14,18 @@ export default function RecordAsset({ row, card }: { row: RecordRow; card: Recor
   const host = useRef<HTMLDivElement>(null)
   const [preview, setPreview] = useState<{ url: string; name: string; trigger: HTMLElement } | null>(null)
   const owner = useAuthStore(s => s.user?.id)
+  const { group_id, record_id } = card
+  const { asset_id, filename, kind } = row
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url) }, [preview])
   useEffect(() => {
-    if (!host.current || !row.asset_id) return
+    if (!host.current || !asset_id) return
     const controller = new AbortController(), token = getAuthToken()
-    const path = `${recordPath(card)}/assets/${encodeURIComponent(row.asset_id)}`
-    const dispose = ElonRecordMedia.mount(host.current, row, {
+    const identity = { group_id, record_id }
+    const path = `${recordPath(identity)}/assets/${encodeURIComponent(asset_id)}`
+    const dispose = ElonRecordMedia.mount(host.current, { kind, filename }, {
       current: () => !controller.signal.aborted && token === getAuthToken(),
       scope: `${resolveApiUrl(path)}:${owner}`,
-      load: () => recordRequest(path, controller.signal, true) as Promise<Blob>,
+      load: () => loadRecordMedia(identity, asset_id, controller.signal),
       openImage: (blob, name, trigger) => {
         const url = URL.createObjectURL(blob)
         setPreview({ url, name, trigger })
@@ -29,7 +33,7 @@ export default function RecordAsset({ row, card }: { row: RecordRow; card: Recor
       },
     })
     return () => { controller.abort(); dispose() }
-  }, [row, card, owner])
+  }, [asset_id, filename, kind, group_id, record_id, owner])
   return <><div ref={host} className="chat-record-asset" />
     {preview && <SocialImagePreview url={preview.url} name={preview.name} returnFocus={preview.trigger} onClose={() => setPreview(null)} />}</>
 }
