@@ -1,7 +1,7 @@
 import { gridReadPort, readGridAttachment, readGridSelection, type GridReadPort } from '../grid-chat/readGridChatSnapshot'
 import { gridSource, sameGridSource, type GridFacts, type GridSource } from '../grid-chat/gridChatSnapshot'
 import { openExchangeWebSession } from '../exchange-webview/exchangeWebviewApi'
-import { GRID_READ_TTL, gridReadResult, listGridRow, parseGridReadRequest } from './binanceGridContract'
+import { GRID_READ_TTL, gridReadResult, listGridRow, detailGridRow, parseGridReadRequest } from './binanceGridContract'
 import type { GridReadError, GridReadRequest, GridReadResult } from './binanceGridContract'
 import type { ResearchCommand } from './types'
 
@@ -90,7 +90,7 @@ export function createBinanceGridReader(deps: Dependencies) {
     } catch { entry.rows = undefined; entry.error = 'context_changed'; return gridReadResult(request, 'failed', 'context_changed') }
     const result = gridReadResult(request, 'pending')
     result.reader = { ...result.reader, status: 'ready', observed_at_ms: entry.observedAt, expires_at_ms: entry.expires }
-    if (request.kind === 'binance_grid_detail') result.reader.row = { ...entry.rows[0] }
+    if (request.kind === 'binance_grid_detail') result.reader.row = detailGridRow(entry.rows[0])
     else {
       if (request.offset > entry.rows.length) return gridReadResult(request, 'failed', 'invalid_request')
       const items = entry.rows.slice(request.offset, request.offset + request.limit).map(listGridRow)

@@ -98,6 +98,18 @@ test('detail refreshes owned list then exact strategy; same symbol never selects
   assert.deepEqual(missing.commands, [['refresh', undefined]])
 })
 
+test('detail wire fields stay compatible with the native v1 validator when share facts grow', async () => {
+  const { result } = await fixture().start(detail)
+  const native = fs.readFileSync(path.resolve(__dirname, '../../../../server/src/node_agent_browser_research_grid.rs'), 'utf8')
+  const fields = [...native.match(/const DETAIL_FIELDS:[\s\S]*?= &\[([\s\S]*?)\];/)[1].matchAll(/"([A-Za-z]+)"/g)].map(match => match[1])
+  assert.deepEqual(Object.keys(result.reader.row).sort(), fields.sort())
+  assert.equal(result.reader.row.symbol, '龙虾USDT')
+  for (const key of ['recordKind', 'end', 'settlement', 'positionState', 'endReason', 'feeBasis', 'roiBasis']) {
+    const bad = structuredClone(result); bad.reader.row[key] = null
+    assert.equal(validGridReadResult(bad, detail), false)
+  }
+})
+
 test('stale data, duplicate IDs, unavailable evidence and changing account/document fail closed', async () => {
   for (const options of [{ stale: true }, { rows: [{ id: '123', symbol: 'BTCUSDT', account: '888' }, { id: '123', symbol: 'BTCUSDT', account: '888' }] },
     { onSleep: state => { state.documentToken = 'other' } }, { onSleep: state => { state.identity.account = '999' } }]) {

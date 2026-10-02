@@ -1,4 +1,4 @@
-import { GRID_FIELDS, projectGrid, type GridFacts } from '../grid-chat/gridChatSnapshot'
+import { projectGrid, type GridFacts } from '../grid-chat/gridChatSnapshot'
 import type { ResearchCommand } from './types'
 
 export const BINANCE_GRID_KINDS = ['binance_grid_list', 'binance_grid_detail'] as const
@@ -8,15 +8,20 @@ export const GRID_READ_ERRORS = ['invalid_request', 'request_conflict', 'request
   'session_unavailable', 'identity_unavailable', 'context_changed', 'read_failed', 'strategy_not_found'] as const
 export type GridReadError = typeof GRID_READ_ERRORS[number]
 export const GRID_LIST_FIELDS = ['id', 'symbol', 'status', 'direction', 'leverage', 'lower', 'upper', 'count', 'spacing'] as const
+// Frozen MCP v1 wire contract, independent of fields added to share cards or ChatGPT drafts.
+export const GRID_DETAIL_FIELDS = [...GRID_LIST_FIELDS, 'created', 'profit', 'investment', 'initialNotional',
+  'perGridQty', 'perGridQuoteQty', 'matchedPnl', 'fundingFee', 'fee', 'matchedCount', 'marginType',
+  'orderCurrency', 'stopUpper', 'stopLower'] as const
 export interface GridReadRequest { kind: BinanceGridKind; id: string; strategy?: string; offset: number; limit: number; start: boolean }
 export type GridListRow = Pick<GridFacts, typeof GRID_LIST_FIELDS[number]>
+export type GridDetailRow = Pick<GridFacts, typeof GRID_DETAIL_FIELDS[number]>
 export interface GridReadResult {
   schema: 'yilong.browser-research.result.v1'
   kind: BinanceGridKind
   reader: {
     schema: 'yilong.binance-grid-read.v1'; request_id: string; status: 'pending' | 'ready' | 'failed'
     error?: GridReadError; observed_at_ms?: number; expires_at_ms?: number
-    items?: GridListRow[]; row?: GridFacts; total?: number; offset?: number; next_offset?: number | null
+    items?: GridListRow[]; row?: GridDetailRow; total?: number; offset?: number; next_offset?: number | null
   }
 }
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -46,8 +51,11 @@ export function gridReadResult(request: GridReadRequest, status: 'pending' | 'fa
 export function listGridRow(row: GridFacts): GridListRow {
   return Object.fromEntries(GRID_LIST_FIELDS.map(key => [key, row[key]])) as GridListRow
 }
+export function detailGridRow(row: GridFacts): GridDetailRow {
+  return Object.fromEntries(GRID_DETAIL_FIELDS.map(key => [key, row[key]])) as GridDetailRow
+}
 function validRow(row: unknown, detail: boolean): boolean {
-  if (!record(row) || !exact(row, detail ? Object.keys(GRID_FIELDS) : GRID_LIST_FIELDS)) return false
+  if (!record(row) || !exact(row, detail ? GRID_DETAIL_FIELDS : GRID_LIST_FIELDS)) return false
   try {
     const facts = projectGrid({ ...row, metrics: row })
     return Object.entries(row).every(([key, value]) => value === facts[key as keyof GridFacts])
