@@ -50,6 +50,25 @@ APK SHA-256：`05608fa30684f190edea35b4f01448b6a61f39587f9f0e52ed15c3f473d6252c`
 无在线安装失败。安装收据位于本机 `.elon/apk-adb-receipts/com.elon.app-1855-d6cfc5a8990d4513bdd94a1e88cf249e.json`。
 此收据只证明安装与版本，不代表本批原生画面验收。
 
+### 发布后整合检查
+
+发布记录提交合并主线时，另一个任务加入聊天记录图片查看修复。
+首次 `finish-ai-task -Kind AndroidFeature` 因这些新 Android 输入尚未发布而拒绝收尾，
+本批书签实现仍与已上线源 `df3214e` 一致。2026-10-03 02:18 只读核对的线上版本为
+1.1.1856，源 `b2eaac5a2b202ad2553feacaf5757a1c76de023b`，包含书签实现提交。
+
+- 整合 build 1857 已编译成功，但 PowerShell 5 上传前校验出现 `Get-FileHash` 不可用，未上传。
+  日志：`bookmark-marker-integrated-apk-publish-20261003-020734-518`。
+- 改用 PowerShell 7 重试，排队后被发布 API 以 HTTP 409
+  `invalid-stage-transition: terminal release stage cannot transition` 拒绝，未开始重建。
+  日志：`bookmark-marker-integrated-apk-retry-20261003-021629-038`。
+- 当时同一源 `37c4411bdae06085f7934d5fb3d2596bb2754f99` 的 build 1858 由另一构建节点持有，
+  不能将其排队或构建状态当作发布完成。继续以线上身份和统一 finish 实际输出为准。
+- 首次收尾输出 `BUSINESS_STATUS=not_checked`、`LOCAL_MAIN_STATUS=not_checked`、
+  `TASK_WORKTREE_STATUS=clean`、`FINALIZABLE=false`，原因是整合版本覆盖不足，并非书签功能未上线。
+  最终收尾日志另存本机 `.elon/task-finish-evidence/reading-bookmark-markers-20261003-finish.log`；
+  未取得最终 `FINALIZABLE=true` 前不得宣称工程收尾完成。
+
 ## 视觉验收边界与后续入口
 
 UI 工作台任务：`desktop_84cfa88d52314f39807a4fa37ca48eab`。

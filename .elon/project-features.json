@@ -23600,14 +23600,14 @@
         },
         {
           "path": "docs/reports/reading-bookmark-message-markers-20261003.md",
-          "content_hash": "eddf6af7aee5a81416ce9b428704b3245b88241ce11cc9f195ffa2caad931783",
+          "content_hash": "0fccf934d2690b37c22825dfc8b3db8ec523c1477167a6c0f2383300b56af88b",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
-            "head_blob_oid": "9c7b45a9cbc034d1ef32963a2658831881a80a46",
-            "worktree_blob_oid": "ccccdb96b29624f530c976a7754d3a1e83021ab9",
+            "head_commit": "37c4411bdae06085f7934d5fb3d2596bb2754f99",
+            "head_blob_oid": "ccccdb96b29624f530c976a7754d3a1e83021ab9",
+            "worktree_blob_oid": "59b7205b13bdfb233ec8bf2674d464764303adb4",
             "state": "tracked_modified"
           }
         },
@@ -23691,7 +23691,7 @@
         }
       ],
       "created_at_ms": 1790962436010,
-      "updated_at_ms": 1790964175191
+      "updated_at_ms": 1790965256245
     },
     {
       "id": "rust-cache-portable-file-hash-v1",
@@ -33753,16 +33753,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b0fbd860bf794566bba9b0e89a43d043",
-      "feature_id": "okx-account-balance-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "余额合同实现，37项自动测试通过；用户验收待补",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1790013641930
-    },
-    {
       "id": "feature_event_00f07ab636c346368997deadd8a75f4e",
       "feature_id": "okx-account-balance-v1",
       "action": "evidence_recorded",
@@ -35751,6 +35741,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790964175191
+    },
+    {
+      "id": "feature_event_16789a88e3904b9cbd686e628ea487fe",
+      "feature_id": "reading-bookmark-message-markers",
+      "action": "evidence_recorded",
+      "actor": "codex-bookmark-markers",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790965256245
     }
   ]
 }
