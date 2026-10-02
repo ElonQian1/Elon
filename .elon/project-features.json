@@ -23511,7 +23511,7 @@
       "id": "reading-bookmark-message-markers",
       "title": "聊天气泡私人书签图标",
       "summary": "三端消息旁显示私人书签及当前续读位置的 emoji 标记，复用稳定消息身份。",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p2",
       "requirement": {
         "path": "docs/requirements/reading-bookmark-message-markers.md",
@@ -23545,15 +23545,153 @@
         "窄屏左右气泡与长消息标记不遮挡内容",
         "验证构建、发布并按规则装机"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_6506babfb9354307b5b6964b58220241",
-        "agent_id": "codex-bookmark-markers",
-        "claimed_at_ms": 1790962436048,
-        "expires_at_ms": 1790976836048
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
+          "content_hash": "98d6f40c36f3b4c6148362af52a2e454b84097381bbd4202e4681c152fbe03ee",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "54694a1205a361a0c9a01064907495ca13ae8acf",
+            "worktree_blob_oid": "54694a1205a361a0c9a01064907495ca13ae8acf",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/reading/ReadingBookmarkControls.kt",
+          "content_hash": "e42a93aeb949337a7b834c70f3d7f0ff63fae0b117541d48fda885977bb7121d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "aa4927d495936a3debe19b259231c5eacd9c1c24",
+            "worktree_blob_oid": "aa4927d495936a3debe19b259231c5eacd9c1c24",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/reading/ReadingBookmarkMarker.kt",
+          "content_hash": "33c62f97d77bbbfda5d40019de4e0dd3c5a187471221d51fc617caf15ddb2e6d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "5265ccaaeaff6519181b856d754d977146628ff0",
+            "worktree_blob_oid": "5265ccaaeaff6519181b856d754d977146628ff0",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/ReadingBookmarkMarkerTest.kt",
+          "content_hash": "4fcdf0628b16844614adf56ef981326dfc4422d1b016ceede0fbe5832c68feb3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "2eff98038d0aceb4e7b6ce203ec7ccdc217d2fe3",
+            "worktree_blob_oid": "2eff98038d0aceb4e7b6ce203ec7ccdc217d2fe3",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/reading-bookmark-message-markers-20261003.md",
+          "content_hash": "eddf6af7aee5a81416ce9b428704b3245b88241ce11cc9f195ffa2caad931783",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "9c7b45a9cbc034d1ef32963a2658831881a80a46",
+            "worktree_blob_oid": "ccccdb96b29624f530c976a7754d3a1e83021ab9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-reading-bookmarks-browser.cjs",
+          "content_hash": "801768f0db545a1b90511e48eaad2fead45013e1e6c6ef9d2059a7ef3bf55516",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "23d64cd4cfd233ac53634a55205214873108eefa",
+            "worktree_blob_oid": "23d64cd4cfd233ac53634a55205214873108eefa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialConversation.tsx",
+          "content_hash": "ec570b765fe8d7f477f794b509ee2f674b1872633bab48a928abbefb313923bc",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "ef2c07909685a7a6356fcffbaa1211f0d63f19b5",
+            "worktree_blob_oid": "ef2c07909685a7a6356fcffbaa1211f0d63f19b5",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-reading-bookmark-markers-browser.cjs",
+          "content_hash": "1810bef6231f0fb787a67350edb1968bee02a94c340775a9ee113bf95f3c818d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "63624d76d144e5ed04e7c22112cd639ce141f716",
+            "worktree_blob_oid": "63624d76d144e5ed04e7c22112cd639ce141f716",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-reading-bookmarks-browser.cjs",
+          "content_hash": "f4d831ccf43e5e612052e93e491598947d60308690d62275ddfb8fe5a9e69d17",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "8036cc9f02bca18b09774c4f472bd09192924d0a",
+            "worktree_blob_oid": "8036cc9f02bca18b09774c4f472bd09192924d0a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/reading_bookmarks.css",
+          "content_hash": "4d8e08d70ec3ace703ffe0636232c62257fd61fef930170b13da1e838c32b51d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "28dc977ea91a2774012b1327b5a24ea35b4325fa",
+            "worktree_blob_oid": "28dc977ea91a2774012b1327b5a24ea35b4325fa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/reading_bookmarks_ui.js",
+          "content_hash": "bb585b902740e7e4ec06697ec044a8eea2d0da6448163d8efb649a47ab1617a9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "df3214eeb342b31dba60a89aeb1a5063888fd6c5",
+            "head_blob_oid": "da81fa1c340bba3aeeac8a329d4e57f749bb2d0c",
+            "worktree_blob_oid": "da81fa1c340bba3aeeac8a329d4e57f749bb2d0c",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1790962436010,
-      "updated_at_ms": 1790962465480
+      "updated_at_ms": 1790964175191
     },
     {
       "id": "rust-cache-portable-file-hash-v1",
@@ -33615,26 +33753,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_96dcacd6df62401ba93d1bfb896b2e7e",
-      "feature_id": "okx-account-balance-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "实现已开始，补充余额读取与授权隔离",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1790013297570
-    },
-    {
-      "id": "feature_event_de75654cea6047498288d9ee81a5a3e5",
-      "feature_id": "okx-account-balance-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1790013641822
-    },
-    {
       "id": "feature_event_b0fbd860bf794566bba9b0e89a43d043",
       "feature_id": "okx-account-balance-v1",
       "action": "transitioned",
@@ -35613,6 +35731,26 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1790962465480
+    },
+    {
+      "id": "feature_event_52016f889eb44add96e679ddabb79e24",
+      "feature_id": "reading-bookmark-message-markers",
+      "action": "evidence_recorded",
+      "actor": "codex-bookmark-markers",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790964175139
+    },
+    {
+      "id": "feature_event_28b6a499782549c0a8d14a00fd35f508",
+      "feature_id": "reading-bookmark-message-markers",
+      "action": "transitioned",
+      "actor": "codex-bookmark-markers",
+      "reason": "三端代码、回归与正式发布已完成；小米已装 build 1855，荣耀离线。原生画面与跨端视觉验收延期，保留 implemented，详见交付报告。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790964175191
     }
   ]
 }
