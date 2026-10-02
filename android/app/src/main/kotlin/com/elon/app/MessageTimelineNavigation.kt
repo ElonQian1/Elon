@@ -17,24 +17,31 @@ internal class MessageTimelineNavigation(private val list: RecyclerView, content
     private var key: String? = null
     private var messages = emptyList<ChatMessage>()
     private var refresh: ((Boolean) -> Unit)? = null
-    private var waiting = false
-    private var loadingHistory = false
-    private val edge = MessageHistoryScroll(list, ::loadOlder)
+    private var waiting: String? = null
+    private var loading: String? = null
+    private val edge = MessageHistoryScroll(list, { load("older") }, { load("latest") })
     init {
         strip.visibility = View.GONE
         strip.addView(older); strip.addView(latest)
         val parent = content.parent as LinearLayout
         parent.addView(strip, parent.indexOfChild(content), LinearLayout.LayoutParams(-1, -2))
-        older.setOnClickListener { loadOlder() }
-        latest.setOnClickListener { waiting = false; saved = null; key?.let { reader.timeline(it)?.latest() }; refresh?.invoke(true) }
+        older.setOnClickListener { load("older") }
+        latest.setOnClickListener { load("latest") }
         reader.onIdle = {
-            loadingHistory = false
+            loading = null
+            val requested = waiting; waiting = null
             buttons()
-            if (waiting) loadOlder()
+            if (requested != null) load(requested)
         }
     }
+    /** Rebind before reading: an empty sync intentionally does not invoke the rows callback. */
+    fun open(key: String, messages: List<ChatMessage>, restorePosition: Boolean = false, refresh: (Boolean) -> Unit) {
+        close()
+        if (!restorePosition) reader.timeline(key)?.latest()
+        update(key, messages, refresh)
+    }
     fun update(key: String, messages: List<ChatMessage>, refresh: (Boolean) -> Unit) {
-        if (this.key != key) { waiting = false; saved = null; loadingHistory = false }
+        if (this.key != key) { waiting = null; saved = null; loading = null }
         this.key = key; this.messages = messages; this.refresh = refresh
         val manager = list.layoutManager as? LinearLayoutManager
         saved?.let { (id, offset) ->
@@ -46,24 +53,29 @@ internal class MessageTimelineNavigation(private val list: RecyclerView, content
     }
     private fun buttons() {
         val state = key?.let(reader::timeline)
-        edge.enabled = state?.hasOlder == true
-        strip.visibility = if (state != null && (state.hasOlder || state.hasNewer)) View.VISIBLE else View.GONE
-        if (state == null) { waiting = false; return }
+        edge.enabled = state != null
+        strip.visibility = if (state != null) View.VISIBLE else View.GONE
+        if (state == null) { waiting = null; return }
         older.visibility = if (state.hasOlder) View.VISIBLE else View.GONE
-        latest.visibility = if (state.hasNewer) View.VISIBLE else View.GONE
-        older.isEnabled = !loadingHistory && !waiting
-        older.text = if (loadingHistory || waiting) "正在加载…" else "加载更早消息"
+        latest.visibility = View.VISIBLE
+        older.isEnabled = loading == null && waiting == null
+        latest.isEnabled = older.isEnabled
+        older.text = if (loading == "older" || waiting == "older") "正在加载…" else "加载更早消息"
+        latest.text = if (loading == "latest" || waiting == "latest") "正在刷新…" else if (state.hasNewer) "回到最新消息" else "刷新最新消息"
     }
-    private fun loadOlder() {
+    private fun load(direction: String) {
         val current = key ?: return
         val state = reader.timeline(current) ?: return
-        if (!state.hasOlder || loadingHistory) { waiting = false; return }
-        if (reader.isReading(current)) { waiting = true; buttons(); return }
-        waiting = false; loadingHistory = true
-        val manager = list.layoutManager as? LinearLayoutManager
-        val position = manager?.findFirstVisibleItemPosition() ?: -1
-        if (position >= 0) saved = messages.getOrNull(position)?.id to (manager?.findViewByPosition(position)?.top ?: 0)
-        state.older(); buttons(); refresh?.invoke(false)
+        if (loading != null || (direction == "older" && !state.hasOlder)) return
+        if (reader.isReading(current)) { waiting = direction; buttons(); return }
+        waiting = null; loading = direction
+        if (direction == "older") {
+            val manager = list.layoutManager as? LinearLayoutManager
+            val position = manager?.findFirstVisibleItemPosition() ?: -1
+            if (position >= 0) saved = messages.getOrNull(position)?.id to (manager?.findViewByPosition(position)?.top ?: 0)
+            state.older()
+        } else { saved = null; state.latest() }
+        buttons(); refresh?.invoke(direction == "latest")
     }
-    fun close() { strip.visibility = View.GONE; saved = null; key = null; refresh = null; messages = emptyList(); waiting = false; loadingHistory = false; edge.enabled = false }
+    fun close() { strip.visibility = View.GONE; saved = null; key = null; refresh = null; messages = emptyList(); waiting = null; loading = null; edge.enabled = false }
 }

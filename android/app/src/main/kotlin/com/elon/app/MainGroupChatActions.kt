@@ -118,6 +118,7 @@ internal class MainGroupChatActions(
         summaryPosts.openGroup(group)
         com.elon.app.articles.ArticleCardViews.openGroup(binding.groupSummaryStrip, group.id)
         pendingReadPosition?.let { binding.chatList.layoutManager?.onRestoreInstanceState(it) }
+        timelineNavigation.open("group:${group.id}", messages, restorePosition) { loadMessages(group, false, it) }
         loadMessages(group, silent = false, scrollToBottom = !restorePosition)
         startPolling()
         webAi.recover()

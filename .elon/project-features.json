@@ -4512,6 +4512,136 @@
       "updated_at_ms": 1789324188988
     },
     {
+      "id": "android-social-timeline-reentry-v1",
+      "title": "Android 社交聊天重入与刷新恢复",
+      "summary": "修复群聊/好友重入沿用历史窗口且空增量不重绑导航，补可发现的最新刷新及触底恢复。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-social-timeline-reentry-v1.md",
+        "content_hash": "8b5f3976cb359a34e11dd473945c662f70762a349847bab1374f91ef1a67e2a8",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "fa29373c88865b2a12119e9fd2513a7ae0d8082f",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "conversation-platform",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/MessageHistoryScroll.kt",
+        "android/app/src/main/kotlin/com/elon/app/MessageTimelineNavigation.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "正常进入重取最新，显式恢复保留历史锚点",
+        "空增量也重绑导航，历史和最新均可继续加载",
+        "完整原生入口测试及小米正式包现场核验"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
+          "content_hash": "205fdcb3b90e761de201d64cff65190216b7fc15ec355ebb6f45ab121f83381b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "80563efccf5cb958f14beb82f1b07836fa7a03b8",
+            "worktree_blob_oid": "81a09f8b660eaa6e150289f42c092cf7ec400f1a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+          "content_hash": "c78e27c2a959d3da292cae16eeb108cc3616a8d00cf78ff89e1316b4d10eb68e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "d046a8dd969168a2b80fbf14d257c8b68dacd7de",
+            "worktree_blob_oid": "dd2cb54f713099f353e0e2cdd683e6981f8ec8b6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MessageHistoryScroll.kt",
+          "content_hash": "64c488f59517176d3c46d0f795570185634bc161b3d098cb622bff79c046764f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "cfbff57f241eeb26e0422f7c37fbc5f30a7d579f",
+            "worktree_blob_oid": "3905c16f21451b7bae8cd062385ff91e4cc02993",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MessageTimelineNavigation.kt",
+          "content_hash": "79ff4d81c68efbc74dfd2983a7a27c4e8155905cb85ac15e2a862f97552dc3c3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "43ceb49e4da2ab63e06be0359a606c3a86d9ebb0",
+            "worktree_blob_oid": "149800fde6091ac6b571c015bc85fd7b5c7ef5fc",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/MessageHistoryNavigationTest.kt",
+          "content_hash": "6a7d030f9c227e503d8dca57d4db972003f6b2c57710f5fa05584b5531826d43",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "1bf9ecfbe255494d71d4e05c9310485ad8cf346e",
+            "worktree_blob_oid": "f64c97facb163ef105b3e380dc9ed58ee07f50c7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/SocialChatStatusTest.kt",
+          "content_hash": "582ba7cc3527c94ca6df282417e7eaf435c87ffac6ce37a66560cacffc916b7f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "a4f2bc69c546e562a8b5d4916bb70f85b5316e6d",
+            "worktree_blob_oid": "a028d90d0354b6646079dde391db7c52624ede90",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/SocialTimelineReentryTest.kt",
+          "content_hash": "be675acdfec66b994d4c039217ecc5782293c7c7aca685f2f2702e1178c20e7a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69b08805a98e7105729e4b5665b3071ff196128f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9b8f76da4bb8d50f992e971979507faed5290ede",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1790909253555,
+      "updated_at_ms": 1790910210224
+    },
+    {
       "id": "android_binance_range_empty_stops_v1",
       "title": "币安区间兼容未设置的保护字段",
       "summary": "保留空保护的私有载荷形状，并在既有跨APK投影中输出null",
@@ -33047,126 +33177,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_807f31115eaf45e1aa4ffbd4125c8c24",
-      "feature_id": "binance-grid-tradfi-rules-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789490415458
-    },
-    {
-      "id": "feature_event_a474b003fa804412ae6106e27eb46c97",
-      "feature_id": "binance-grid-tradfi-rules-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789490727633
-    },
-    {
-      "id": "feature_event_d5b4f639e763486899f866fe32cf156e",
-      "feature_id": "binance-grid-tradfi-rules-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789491021484
-    },
-    {
-      "id": "feature_event_00f41b32edea4b5b893de87e4a7f317a",
-      "feature_id": "binance-grid-tradfi-rules-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789491651611
-    },
-    {
-      "id": "feature_event_e8990473902842df9aed008502b46111",
-      "feature_id": "social-link-cards-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789492845079
-    },
-    {
-      "id": "feature_event_bd6e23f98b504a3198c83c1f93506cfa",
-      "feature_id": "social-link-cards-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789492845121
-    },
-    {
-      "id": "feature_event_e114e7061ed74295a0b730e6600af61e",
-      "feature_id": "social-link-cards-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789492845155
-    },
-    {
-      "id": "feature_event_4ce2399b41f64648b6c428fc957dc267",
-      "feature_id": "social-link-cards-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789493107578
-    },
-    {
-      "id": "feature_event_5b28190e67774461b86951e62998bc3a",
-      "feature_id": "social-link-cards-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "六平台三端入口已实现，主线系统分享能力已合并并去重",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789493107637
-    },
-    {
-      "id": "feature_event_75a5af7cd974432b8d973a308d6b75cb",
-      "feature_id": "social-link-cards-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "生产源码 Rust 14 项、Android 4 项、Web 回归及合并后 PC/Android 构建通过；平台和设备验收边界已记录",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789493177891
-    },
-    {
-      "id": "feature_event_ab8f4c2eba8b41e08c1e03bbf7533501",
-      "feature_id": "social-link-cards-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "APK 1.1.1773、Server/PWA 0.3.1763 与 PC bundle 已发布 c9748fe；线上来源、资源哈希与完成检查通过。卡片宽窄屏 PNG 已检查；设备播放、登录恢复及跨端视觉验收延期。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789542082009
-    },
-    {
-      "id": "feature_event_b779c095129c44919058f1165afbb9ce",
-      "feature_id": "binance-grid-rich-reports-v2",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789543159503
-    },
-    {
       "id": "feature_event_a2fe40807b604d5e9b6723c272bb1a30",
       "feature_id": "binance-grid-rich-reports-v2",
       "action": "claimed",
@@ -35045,6 +35055,126 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1790867633028
+    },
+    {
+      "id": "feature_event_b56f2c9d68be43a6a1d3bbbb2bffb0fc",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "registered",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790909253555
+    },
+    {
+      "id": "feature_event_54985932333c49799503ceb623b287d6",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "claimed",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790909253797
+    },
+    {
+      "id": "feature_event_4feff8f81ec34539ac5b1afd9d0c9231",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790909348316
+    },
+    {
+      "id": "feature_event_4faa9ec405d744f5a099fcd9063da703",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "claim_released",
+      "actor": "codex-social-reentry",
+      "reason": "定向回归通过，更新需求验证状态后按正式流程重绑并登记当前证据",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1790910203633
+    },
+    {
+      "id": "feature_event_f523a5cc72e745f2acaa157420a276e7",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-social-reentry",
+      "reason": "24 项原生定向测试通过，需求实现状态改为 verified",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1790910206094
+    },
+    {
+      "id": "feature_event_6f27c94ce46b446da719b0a0fc095274",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1790910206331
+    },
+    {
+      "id": "feature_event_6c642fcc5fe348189993ae7046c1eeb9",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1790910206511
+    },
+    {
+      "id": "feature_event_bd1d3a54262d40ea8bb291b6415e92b0",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "claimed",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790910206689
+    },
+    {
+      "id": "feature_event_fde5a53c43fa44e1bc1f8db4cb057e8e",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790910206950
+    },
+    {
+      "id": "feature_event_4f547f0918ca4e06af6128435b4eab99",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-social-reentry",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790910209857
+    },
+    {
+      "id": "feature_event_44f6782066384d088807fa088fb34796",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "24 项原生回归通过，正式发布与真机复核待补",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790910210033
+    },
+    {
+      "id": "feature_event_144233d049b842ebbaa0f32a4de6ed13",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "24 项原生回归通过，正式发布与真机复核待补",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1790910210224
     }
   ]
 }

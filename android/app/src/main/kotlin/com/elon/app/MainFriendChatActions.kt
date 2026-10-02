@@ -98,6 +98,7 @@ internal class MainFriendChatActions(
         showFriendChat(friend.name, animate)
         quotes.open("friend:${friend.id}")
         onActiveFriendChanged(friend)
+        timelineNavigation.open("friend:${friend.id}", messages) { loadMessages(friend, false, it) }
         loadMessages(friend, silent = false, scrollToBottom = true)
         startPolling()
     }
@@ -142,6 +143,7 @@ internal class MainFriendChatActions(
         binding.inputEdit.removeTextChangedListener(typingWatcher)
         binding.inputEdit.addTextChangedListener(typingWatcher)
         if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        timelineNavigation.open("friend:${friend.id}", messages, restorePosition = true) { loadMessages(friend, false, it) }
         loadMessages(friend, silent = true, scrollToBottom = false)
         startPolling()
     }

@@ -73,9 +73,10 @@ class MessageHistoryNavigationTest {
             rows.clear(); repeat(data.length()) { rows.add(ChatMessage("assistant", data.getJSONObject(it).getString("content"), id = data.getJSONObject(it).getString("id"))) }
             adapter.notifyDataSetChanged(); navigation.update("group:g", rows) { read() }; layout()
         }, error = { failure = it }) }
-        fun gesture() {
+        fun gesture(towardLatest: Boolean = false) {
             val now = android.os.SystemClock.uptimeMillis()
-            for ((action, y) in listOf(MotionEvent.ACTION_DOWN to 20f, MotionEvent.ACTION_MOVE to 330f, MotionEvent.ACTION_UP to 330f)) {
+            val start = if (towardLatest) 330f else 20f; val end = if (towardLatest) 20f else 330f
+            for ((action, y) in listOf(MotionEvent.ACTION_DOWN to start, MotionEvent.ACTION_MOVE to end, MotionEvent.ACTION_UP to end)) {
                 val event = MotionEvent.obtain(now, now + if (action == MotionEvent.ACTION_DOWN) 0 else 60, action, 100f, y, 0)
                 list.dispatchTouchEvent(event); event.recycle()
             }
@@ -94,6 +95,9 @@ class MessageHistoryNavigationTest {
             failOlder = true; manager.scrollToPositionWithOffset(0, 0); layout(); gesture(); pump { failure != null }
             assertEquals(50, rows.size)
             failOlder = false; gesture(); pump { rows.first().id == "0100" }; assertTrue(rows.size <= 150)
+            manager.scrollToPosition(rows.lastIndex); layout(); gesture(towardLatest = true)
+            pump { rows.size == 50 && rows.first().id == "0150" }
+            assertEquals("0199", rows.last().id)
             navigation.close(); val count = calls.get(); manager.scrollToPositionWithOffset(0, 0); layout(); gesture()
             assertEquals(count, calls.get())
         } finally { navigation.close(); reader.cancel(); SocialChatSnapshotStore.clear(context); parent.removeAllViews(); controller.pause().stop().destroy() }

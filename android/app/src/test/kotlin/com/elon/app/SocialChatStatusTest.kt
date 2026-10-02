@@ -10,6 +10,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -56,9 +58,12 @@ class SocialChatStatusTest {
             if (chain.request().method == "GET") {
                 requestStarted.countDown(); releaseRead.await(3, TimeUnit.SECONDS); readFinished.countDown()
             }
+            val body = if (chain.request().url.encodedPath == "/api/me/message-timeline" && statusCode == 200)
+                JSONObject(response).put("schema", "elon.message_timeline.v1").put("removed_ids", JSONArray())
+                    .put("has_more", false).put("sync", "fixture-checkpoint").toString() else response
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                 .code(if (chain.request().method == "GET") statusCode else 503).message("fixture")
-                .body((if (chain.request().method == "GET") response else "{\"error\":\"发送失败\"}").toResponseBody()).build()
+                .body((if (chain.request().method == "GET") body else "{\"error\":\"发送失败\"}").toResponseBody()).build()
         }.build()
         friend = MainFriendChatActions(activity, binding, client, "https://status.invalid", {}, { _, _ -> },
             { _, _ -> }, {}, { _, _, _ -> }, { "status-test" }, {}, {}, {})
