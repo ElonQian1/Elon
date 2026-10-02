@@ -117,7 +117,11 @@ async function main() {
     const jpegRef = { ...image, file_name: 'photo.jpg', mime_type: 'image/jpeg', url: origin + '/api/user/mobile-v2-fixture/chat-attachments/download/' + state.uploads.length };
     state.uploads.push({ attachment: jpegRef, buffer: Buffer.from(jpeg, 'base64') });
     state.messages.push({ path: '/api/me/groups/attach-group/messages', message: { ...original, id: 'jpeg', attachments: [jpegRef] } });
-    await row('jpeg').waitFor(); await page.evaluate(() => { window.copied = null; });
+    // Re-enter the latest window; background arrivals must not move a history reader.
+    await enter(); await row('jpeg').waitFor();
+    await page.evaluate(() => { window.copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write: async items => {
+      const blob = await items[0].getType('image/png'); window.copied = Array.from(new Uint8Array(await blob.arrayBuffer()));
+    } } }); });
     await open('jpeg'); await menu().getByRole('button', { name: '复制', exact: true }).tap(); await page.waitForFunction(() => Array.isArray(window.copied));
     assert.deepEqual((await page.evaluate(() => copied)).slice(0, 8), [137, 80, 78, 71, 13, 10, 26, 10]); cases.push('jpeg-copied-as-browser-compatible-png');
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {} }));
@@ -136,7 +140,8 @@ async function main() {
     }
     await enter(); await quote('group-photo');
     state.messages.find(x => x.message.id === 'group-photo').message.revision = 2;
-    await preview().getByText('原消息已修改或不可用，请取消后重新引用').waitFor();
+    // Production timeline sync is every 15 s; retain the real schedule here.
+    await preview().getByText('原消息已修改或不可用，请取消后重新引用').waitFor({ timeout: 20000 });
     const posts = state.messages.length; await page.locator('#messageInput').fill('不得发送'); await page.locator('#sendBtn').tap();
     await page.waitForFunction(() => document.querySelector('#messageInput').value === '不得发送');
     assert.equal(state.messages.length, posts); cases.push('source-revision-fails-before-write');

@@ -50,6 +50,13 @@ async function attachmentFixture(context) {
     }
     if (p === '/api/me/groups') return json({ groups: [{ id: 'attach-group', name: '附件测试群', member_count: 2 }] });
     if (p === '/api/me/friends') return json({ friends: [{ id: 'attach-friend', nickname: '附件测试好友' }] });
+    if (p === '/api/me/message-timeline/read') return json({});
+    if (p === '/api/me/message-timeline' || p === '/api/me/message-timeline/window') {
+      const query = request.method() === 'POST' ? request.postDataJSON() : Object.fromEntries(url.searchParams);
+      const source = `/api/me/${query.kind}s/${query.id}/messages`;
+      const messages = state.messages.filter(item => item.path === source).map(item => ({ ...item.message, timeline_cursor: item.message.id }));
+      return json({ schema: 'elon.message_timeline.v1', messages, removed_ids: [], has_more: false, sync: 'fixture-live' });
+    }
     if (/^\/api\/me\/(groups|friends)\/attach-/.test(p)) {
       if (request.method() === 'POST' && p.endsWith('/messages')) {
         if (state.failSend) return json({ error: 'synthetic uncertain send' }, 503);
