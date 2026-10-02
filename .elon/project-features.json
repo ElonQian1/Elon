@@ -4515,7 +4515,7 @@
       "id": "android-social-timeline-reentry-v1",
       "title": "Android 社交聊天重入与刷新恢复",
       "summary": "修复群聊/好友重入沿用历史窗口且空增量不重绑导航，补可发现的最新刷新及触底恢复。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-social-timeline-reentry-v1.md",
@@ -4639,7 +4639,7 @@
         }
       ],
       "created_at_ms": 1790909253555,
-      "updated_at_ms": 1790910210224
+      "updated_at_ms": 1790911198949
     },
     {
       "id": "android_binance_range_empty_stops_v1",
@@ -33177,16 +33177,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a2fe40807b604d5e9b6723c272bb1a30",
-      "feature_id": "binance-grid-rich-reports-v2",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789543159567
-    },
-    {
       "id": "feature_event_a77d75a5a02544db8c5b5537fbddc907",
       "feature_id": "binance-grid-rich-reports-v2",
       "action": "transitioned",
@@ -35175,6 +35165,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1790910210224
+    },
+    {
+      "id": "feature_event_61ff41f9e11c4471b10bb3ac39823b51",
+      "feature_id": "android-social-timeline-reentry-v1",
+      "action": "transitioned",
+      "actor": "codex-social-reentry",
+      "reason": "正式 APK 1.1.1849 已发布并安装小米；24项回归通过，群聊最新摘要一致、自动跨页至143-148条、触底刷新、退出重入及重入后分页现场通过。详见 docs/reports/android-social-timeline-reentry-20261002.md",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1790911198949
     }
   ]
 }
