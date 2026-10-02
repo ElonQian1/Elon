@@ -2,7 +2,6 @@ package com.elon.app.chatrecords
 
 import android.app.Activity
 import android.content.Intent
-import android.widget.ImageView
 import android.widget.VideoView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
@@ -10,13 +9,15 @@ import java.io.File
 
 internal object ChatRecordMedia {
     fun open(activity: Activity, row: RecordRow, file: File, videoChanged: (VideoView?) -> Unit) {
+        if (row.kind == "image") {
+            com.elon.app.ChatImageViewer.show(activity, com.elon.app.ChatAttachment(
+                kind = "image", displayName = row.filename.ifBlank { "图片" },
+                fileName = row.filename, localPath = file.path
+            ))
+            return
+        }
         val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
         when (row.kind) {
-            "image" -> {
-                val image = ImageView(activity).apply { adjustViewBounds = true; contentDescription = row.filename; scaleType = ImageView.ScaleType.FIT_CENTER }
-                val dialog = AlertDialog.Builder(activity).setTitle(row.filename).setView(image).setPositiveButton("关闭", null).show()
-                com.elon.app.ChatImagePreviewLoader.load(activity, file.path) { bitmap -> image.post { if (dialog.isShowing) image.setImageBitmap(bitmap) } }
-            }
             "video" -> {
                 val video = VideoView(activity); videoChanged(video)
                 val frame = android.widget.FrameLayout(activity).apply { minimumHeight = (320 * resources.displayMetrics.density).toInt(); addView(video, android.widget.FrameLayout.LayoutParams(-1, -1)) }
