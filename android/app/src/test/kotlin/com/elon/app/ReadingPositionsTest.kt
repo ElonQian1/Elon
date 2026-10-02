@@ -21,6 +21,26 @@ import java.util.concurrent.CopyOnWriteArrayList
 @Config(sdk = [28], manifest = Config.NONE, application = Application::class)
 class ReadingPositionsTest {
     private fun pump(until: () -> Boolean) { repeat(300) { shadowOf(Looper.getMainLooper()).idle(); if (until()) return; Thread.sleep(10) }; assertTrue(until()) }
+    @Test fun firstOnlineLoadEstablishesOrdinaryProgressRevisionBeforeReading() {
+        val context = RuntimeEnvironment.getApplication()
+        AuthManager.prefs(context).edit().putString("auth_user_id", "initial-reading-fixture").putString("auth_token", "fixture-token").putLong("auth_expires_at", 0).commit()
+        context.getSharedPreferences("reading_positions_v1", 0).edit().clear().commit()
+        val requests = CopyOnWriteArrayList<JSONObject>()
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            val body = if (request.url.encodedPath.endsWith("capabilities")) "{\"reading_bookmarks\":true}"
+                else if (request.method == "GET") "{\"bookmarks\":[],\"conversation_progress\":{\"position\":{\"message_id\":\"previous\"},\"revision\":7}}"
+                else { val buffer = okio.Buffer(); request.body!!.writeTo(buffer); val op = JSONObject(buffer.readUtf8()); requests.add(op)
+                    JSONObject().put("progress", JSONObject().put("position", op.getJSONObject("position")).put("revision", 8)).toString() }
+            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("fixture").body(body.toResponseBody()).build()
+        }.build()
+        val model = ReadingPositions(context, client, "https://test.invalid", "group:g") {}
+        try {
+            model.load(); pump { model.supported }
+            model.putPosition(JSONObject().put("message_id", "current")); model.flush(); pump { model.pending == 0 }
+            assertEquals(7L, requests.single().getLong("base_revision"))
+        } finally { model.close() }
+    }
     @Test fun separateBookmarksAndOfflineRestartPreserveAnchorsProgressAndOperationIds() {
         val context = RuntimeEnvironment.getApplication()
         AuthManager.prefs(context).edit().putString("auth_user_id", "reading-fixture").putString("auth_token", "fixture-token").putLong("auth_expires_at", 0).commit()

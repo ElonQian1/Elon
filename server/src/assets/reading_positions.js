@@ -8,6 +8,7 @@
     const storage = options.storage || root.localStorage;
     const key = `elon.reading.v1:${owner}:${scopeKey(scope)}`;
     let alive = true, busy = false, active = null, timer = null, sending = '', supported = false, unavailable = false, error = '';
+    let firstLoad = true, positionChanged = false;
     let state = { bookmarks: [], conversation_progress: null, conversation_candidates: [], queue: [], sequence: 0, device: uid() };
     try {
       const saved = JSON.parse(storage.getItem(key) || 'null');
@@ -50,7 +51,7 @@
         s.queue = s.queue.filter(q => !(q.action === 'progress' && q.bookmark_id === id && q.operation_id !== sending));
         s.queue.push(operation('progress', id, { position, base_revision: revision }));
       });
-      if (ok) schedule();
+      if (ok) { positionChanged = true; schedule(); }
       return ok;
     }
     function add(message, title = '', note = '', duplicate = false) {
@@ -112,7 +113,7 @@
           rows.push(...response.bookmarks); next = response.next || '';
           ordinary = response.conversation_progress; candidates = response.conversation_candidates || [];
         } while (next && rows.length < 100);
-        save(s => {
+        const saved = save(s => {
           s.supported = supported;
           const removed = new Set(s.queue.filter(q => q.action === 'delete').map(q => q.bookmark_id));
           const local = s.bookmarks.filter(b => s.queue.some(q => q.action === 'create' && q.bookmark_id === b.id) && !rows.some(r => r.id === b.id));
@@ -122,6 +123,9 @@
           }
           s.conversation_progress = ordinary; s.conversation_candidates = candidates;
         });
+        if (!saved) return;
+        if (firstLoad && active?.id === '' && !positionChanged && !pendingPosition('')) active.revision = progress('')?.revision || 0;
+        firstLoad = false;
         if (active?.id && !entry(active.id)) { active = null; error = '正在阅读的书签已删除'; notify(); }
         void flush();
       } catch (e) {

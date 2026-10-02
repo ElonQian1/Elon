@@ -51,7 +51,7 @@ owner: conversation-platform
 
 已取得的证据：
 
-- JS 14 项通过：十万条有界窗口、多书签、离线重启、延迟回执、保存失败、删除不复活、冲突。
+- JS 15 项通过：十万条有界窗口、多书签、离线重启、延迟回执、保存失败、删除不复活、冲突及首次进度同步。
 - Rust 完整服务端中 16 项消息时间线/书签测试通过：`bookmarks-rust-resume-20261002-151552-733`。
   包含五项新增真实 SQLite 书签测试；十万条定位、权限隔离、幂等、回退冲突和删除降级均通过。
 - PWA 浏览器测试通过：`bookmarks-browser-final-20261002-135611-997`；真实 UI/恢复控制器，API 使用合成数据。
@@ -60,6 +60,9 @@ owner: conversation-platform
 - 失效书签协议恢复后的 PWA 与 TypeScript 复验通过：`bookmarks-browser-rollback-20261002-152137-117`、`bookmarks-pc-rollback-types-20261002-152311-385`。
 - APK 七个测试类最终 27 项通过：`bookmarks-android-missing-target-20261002-152250-619`；
   含失效书签保留窗口/恢复协议、真实 RecyclerView 重试、控制器重入及本机离线恢复。
+- 首次在线加载普通阅读进度时初始化版本基准，避免新设备误报冲突；已捕获或排队的位置保留原版本，真实冲突仍须选择。
+  新增回归后 APK 合计覆盖 28 项，其中 ReadingPositions 两项复验通过：`bookmarks-android-initial-progress-20261002-155034-473`。
+  PWA/Win 浏览器复验分别通过：`bookmarks-browser-baseline-20261002-155903-612`、`bookmarks-win-baseline-20261002-155916-015`。
 - 移动 V2 自测 12 项及规范检查通过；只证明治理合同，不替代设备运行验收。
 
 ## 构建兼容修复

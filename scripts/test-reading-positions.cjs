@@ -1,6 +1,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../server/src/assets/reading_positions.js');
+test('first online load establishes ordinary progress without rebasing locally captured progress', async () => {
+  for (const capturedBeforeLoad of [false, true]) {
+    const sent = [];
+    const model = ElonReadingPositions.create({ owner: 'initial', scope: { kind: 'group', id: 'g' },
+      storage: { getItem() { return null; }, setItem() {} }, request: async (method, path, body) => {
+        if (path.includes('capabilities')) return { reading_bookmarks: true, timeline_around: true };
+        if (method === 'GET') return { bookmarks: [], conversation_progress: { position: { message_id: 'previous' }, revision: 7 } };
+        sent.push(body); return { progress: { position: body.position, revision: 8 } };
+      } });
+    model.activate('');
+    if (capturedBeforeLoad) model.putPosition({ message_id: 'current' });
+    await model.load();
+    if (!capturedBeforeLoad) model.putPosition({ message_id: 'current' });
+    await model.flush();
+    assert.equal(sent[0].base_revision, capturedBeforeLoad ? 0 : 7); model.close();
+  }
+});
 function fixture(storage = { text: null, getItem() { return this.text; }, setItem(k, v) { this.text = v; } }) {
   const sent = [], rows = []; let reject = null, hold = null;
   const model = ElonReadingPositions.create({ owner: 'u', scope: { kind: 'group', id: 'g' }, storage,

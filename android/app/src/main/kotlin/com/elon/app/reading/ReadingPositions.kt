@@ -28,7 +28,9 @@ internal class ReadingPositions(private val context: Context, private val http: 
     private var sending = ""
     private val device = UUID.randomUUID().toString()
     private var sequence = 0L
-    private var activeRevision = 0L
+    private var activeRevision = state.optJSONObject("conversation_progress")?.optLong("revision") ?: 0L
+    private var firstLoad = true
+    private var positionChanged = false
     var active: String? = ""; private set
     var supported = state.optBoolean("supported"); private set
     var denied = false; private set
@@ -99,7 +101,7 @@ internal class ReadingPositions(private val context: Context, private val http: 
             state.put("queue", JSONArray(queue().filterNot { it.optString("action") == "progress" && it.optString("bookmark_id") == id && it.optString("operation_id") != sending }))
             enqueue(operation("progress", id).put("base_revision", if (active == id) activeRevision else progress(id)?.optLong("revision") ?: 0L).put("position", position))
         }
-        if (ok) schedule(); return ok
+        if (ok) { positionChanged = true; schedule() }; return ok
     }
     fun restore(item: JSONObject): String? {
         val id = add(ChatMessage("user", "", id = item.getJSONObject("anchor").getString("message_id")), item.optString("title"), item.optString("note"), true)
@@ -139,7 +141,7 @@ internal class ReadingPositions(private val context: Context, private val http: 
                 if (!valid()) return@post
                 result.onSuccess { page ->
                     supported = true
-                    save {
+                    val saved = save {
                         state.put("supported", true)
                         val remote = array(page.optJSONArray("bookmarks")); val removed = queue().filter { it.optString("action") == "delete" }.map { it.optString("bookmark_id") }
                         val local = bookmarks.filter { row -> queue().any { it.optString("action") == "create" && it.optString("bookmark_id") == row.optString("id") } && remote.none { it.optString("id") == row.optString("id") } }
@@ -147,6 +149,11 @@ internal class ReadingPositions(private val context: Context, private val http: 
                         queue().filter { it.optString("action") == "update" }.forEach { edit -> item(edit.optString("bookmark_id"))?.put("title", edit.optString("title"))?.put("note", edit.optString("note")) }
                         state.put("conversation_progress", page.opt("conversation_progress")).put("conversation_candidates", page.opt("conversation_candidates"))
                     }
+                    if (!saved) return@onSuccess
+                    if (firstLoad && active == "" && !positionChanged && queue().none { it.optString("bookmark_id").isEmpty() && it.optString("action") in listOf("progress", "resolve") }) {
+                        activeRevision = progress("")?.optLong("revision") ?: 0L
+                    }
+                    firstLoad = false
                     done(); flush()
                 }.onFailure(::failed); changed()
             }
