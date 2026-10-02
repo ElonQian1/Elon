@@ -23,4 +23,10 @@
 
 ## 交付
 
-本报告随实现提交；正式版本、装机及线上身份以本轮发布回执和后续追加的验收记录为准。浏览器与 Robolectric 验证不能替代已安装 Win 壳或实体手机运行验证。
+- 实现提交：Win `70284cc04`、PWA `0aeea05a6`、APK `d1b96ff9e`，均已推送 `origin/main`。
+- PWA 静态模板发布通过；源 `d1b96ff9e`，SHA-256 `f1fc7f6a860c50855cca2dd4c065844ca14eb2078f9ec39c4b1e52556dbf864f`。PC `/pc` 前端同源发布通过，兼容现有服务器 `v0.3.1815`。
+- APK `1.1.1853 / 1853` 发布并自动安装到注册小米；荣耀离线，未操作。
+- 小米通过 MCP 放入本地 `fixed_image_fidelity_v1` 测试附件，外部语义测试通过 open、reading_toggle、pinch、close。1080×6000 真机截图确认 ROW 0 从顶部适宽显示，底部工具不遮挡阅读区。
+- 验收后移除测试附件，确认 pending_count=0、fixture_staged=false、upload_started=false；未发送消息、未清除登录态。
+- Windows 本地组件首轮因 APK 发布临时版本修改而等待，重试因 C 盘 TEMP 不满足容量安全线被拒绝。D 盘容量预检可用，后续构建仅将本次 TEMP/TMP 放到任务 D 盘临时目录，不降低容量门槛、不删除其他缓存。
+- 浏览器与 Robolectric 验证不替代已安装 Win 壳或实体 iPhone 验证；Windows 本地发布及激活状态另附回执。

@@ -35,6 +35,12 @@ public final class ImageViewerUiAcceptance extends UiAutomatorTestCase {
         } else {
             assertTrue("full_image_not_ready", text("1080 × 6000").waitForExists(15000));
             if (step.equals("original_scale")) click(desc("原始比例"));
+            else if (step.equals("reading_toggle")) {
+                click(desc("查看整图"));
+                assertTrue("overview_toggle_missing", desc("长图阅读").waitForExists(3000));
+                click(desc("长图阅读"));
+                assertTrue("reading_toggle_missing", desc("查看整图").waitForExists(3000));
+            }
             else if (step.equals("pinch")) {
                 UiObject image = desc("高清图片：" + FILE);
                 assertTrue("image_not_found", image.exists());
