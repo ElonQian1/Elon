@@ -2,6 +2,7 @@ import { Grid3X3, LoaderCircle, X } from 'lucide-react'
 import { gridCaption, GRID_FIELDS } from './gridChatSnapshot'
 import type { GridChatAttachmentController } from './useGridChatAttachment'
 import styles from './GridChatAttachmentControl.module.css'
+import GridHistoryControls from '../grid-history/GridHistoryControls'
 
 export default function GridChatAttachmentControl({ control }: { control: GridChatAttachmentController }) {
   if (!control.available) return null
@@ -20,6 +21,7 @@ export default function GridChatAttachmentControl({ control }: { control: GridCh
           </button>
         )}
       </div>
+      <GridHistoryControls selection={selection} busy={busy || !control.canRead} read={(days, page) => void control.readHistory(days, page)} />
       {error && <div className={styles.error} role="alert">
         <span>{error}</span>
         <button type="button" onClick={() => void control.openBinance()} disabled={busy}>打开币安官网</button>
@@ -38,7 +40,7 @@ export default function GridChatAttachmentControl({ control }: { control: GridCh
           <strong>{gridCaption(attachment.facts)}</strong>
           <span>{new Date(attachment.observedAtMs).toLocaleTimeString()} 读取 · 展开查看发送内容</span>
         </summary>
-        <p>仅所选网格；缺失值为“未读取”。有效期 5 分钟，发送不会自动刷新。</p>
+        <p>仅所选网格；缺失值为“未读取”。{attachment.facts.recordKind === 'HISTORY' ? '历史记录可长期复盘，未确认的结算不能当作最终盈利。' : '有效期 5 分钟。'}发送不会自动刷新。</p>
         <dl>{Object.entries(GRID_FIELDS).map(([key, label]) => <div key={key}>
           <dt>{label}</dt><dd>{attachment.facts[key as keyof typeof GRID_FIELDS] ?? '未读取'}</dd>
         </div>)}</dl>

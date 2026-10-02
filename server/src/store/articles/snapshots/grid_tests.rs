@@ -17,6 +17,58 @@ fn doc() -> SnapshotDocument {
 }
 
 #[test]
+fn ended_grid_preserves_chinese_identity_unknown_settlement_and_historical_age() {
+    let mut document = doc();
+    let grid = document.grid.as_mut().unwrap();
+    grid.show_amounts = true;
+    grid.observed_at_ms -= 86_400_000;
+    for (key, value) in [
+        ("symbol", "龙虾USDT"),
+        ("recordKind", "HISTORY"),
+        ("status", "CANCELED"),
+        ("profit", "479.92684725"),
+        ("settlement", "UNKNOWN"),
+        ("positionState", "UNKNOWN"),
+    ] {
+        grid.fields.insert(key.into(), value.into());
+    }
+    document.title = grid.title();
+    document.summary = grid.summary();
+    assert_eq!(document.title, "龙虾USDT 历史网格");
+    assert!(document.validate().is_ok());
+    assert!(tests::fixture()
+        .create_ai_snapshot("author", "g1", "history-grid", document.clone())
+        .is_ok());
+    document
+        .grid
+        .as_mut()
+        .unwrap()
+        .fields
+        .insert("settlement".into(), "CONFIRMED".into());
+    assert!(document.validate().is_err());
+    document
+        .grid
+        .as_mut()
+        .unwrap()
+        .fields
+        .insert("totalPnl".into(), "-12.34".into());
+    document
+        .grid
+        .as_mut()
+        .unwrap()
+        .fields
+        .insert("positionState".into(), "CLOSED".into());
+    assert!(document.validate().is_ok());
+    document
+        .grid
+        .as_mut()
+        .unwrap()
+        .fields
+        .insert("status".into(), "WORKING".into());
+    assert!(document.validate().is_err());
+}
+
+#[test]
 fn grid_share_rejects_private_fields_hidden_amounts_invalid_values_and_stale_reads() {
     assert!(doc().validate().is_ok());
     for (key, value) in [

@@ -12,13 +12,15 @@ import androidx.core.widget.doAfterTextChanged
 internal object GridSharePicker {
     fun show(context: Context, rows: List<Map<String, String?>>, selected: (Map<String, String?>) -> Unit): AlertDialog {
         val s = GridShareStyle(context)
-        val source = GridSharePresentation.sortRows(rows)
+        val historical = rows.firstOrNull()?.get("recordKind") == "HISTORY"
+        val source = if (historical) rows.sortedByDescending { it["end"]?.toLongOrNull() ?: 0 } else GridSharePresentation.sortRows(rows)
+        val ordering = if (historical) "本页最近结束优先" else "按网格利润从高到低"
         var visible = source
         val search = EditText(context).apply {
             hint = "搜索代币，例如 QNT"; setSingleLine(); minHeight = s.dp(48)
             setTextColor(s.ink); setHintTextColor(s.muted); contentDescription = "搜索网格代币"
         }
-        val count = s.text("共 ${source.size} 条 · 按网格利润从高到低", 12f, true)
+        val count = s.text("共 ${source.size} 条 · $ordering", 12f, true)
         val list = ListView(context).apply { divider = null; contentDescription = "可分享的币安网格" }
         val adapter = object : BaseAdapter() {
             override fun getCount() = visible.size
@@ -38,6 +40,7 @@ internal object GridSharePicker {
                     })
                     addView(s.text("网格利润 · USDT", 12f, true))
                     addView(s.text(GridSharePresentation.format(profit, true), 21f).apply { setTextColor(s.tone(profit)); typeface = Typeface.DEFAULT_BOLD })
+                    if(item["recordKind"] == "HISTORY") addView(s.text("已结束 · " + (item["end"]?.toLongOrNull()?.let { java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it)) } ?: "时间未读取") + "\n网格利润不代表最终总盈亏", 12f, true))
                     minimumHeight = s.dp(108)
                 }
             }
@@ -52,7 +55,7 @@ internal object GridSharePicker {
         search.doAfterTextChanged {
             val query = it.toString().trim()
             visible = source.filter { row -> row["symbol"].orEmpty().contains(query, ignoreCase = true) }
-            count.text = if (visible.isEmpty()) "没有匹配的网格" else "${visible.size} 条 · 按网格利润从高到低"
+            count.text = if (visible.isEmpty()) "没有匹配的网格" else "${visible.size} 条 · $ordering"
             adapter.notifyDataSetChanged()
         }
         list.setOnItemClickListener { _, _, index, _ -> val item = visible[index]; dialog.dismiss(); selected(item) }

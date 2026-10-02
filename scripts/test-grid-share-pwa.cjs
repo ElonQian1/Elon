@@ -75,6 +75,19 @@ async function main() {
       if(width===390&&scale===1)await page.screenshot({path:path.join(output,theme+'-card.png')});
     }
     await page.goto(origin);
+    const historical={...ref,title:'龙虾USDT 历史网格',grid:{...grid,fields:{...grid.fields,symbol:'龙虾USDT',recordKind:'HISTORY',status:'CANCELED',created:'1790800000000',end:'1790900000000',settlement:'UNKNOWN',positionState:'UNKNOWN'}}};
+    state.view={...view,document:{title:historical.title,grid:historical.grid}};
+    await page.evaluate(ref=>draw(ref),historical);
+    assert.ok((await page.locator('.grid-share-card').innerText()).includes('龙虾USDT'));
+    assert.ok((await page.locator('.grid-share-card').innerText()).includes('最终总盈亏未读取'));
+    assert.ok((await page.locator('.grid-share-card').innerText()).includes('网格利润（非总盈亏）'));
+    assert.equal(await page.locator('.grid-share-range-track').count(),0);
+    for(const width of [320,390]){await page.setViewportSize({width,height:844});assert.equal(await page.locator('.grid-share-card').evaluate(el=>el.scrollWidth>el.clientWidth),false);}
+    await open();await page.getByRole('tab',{name:'历史',exact:true}).click();
+    assert.ok((await page.locator('.grid-share-rows').innerText()).includes('未确认'));
+    assert.equal(await page.getByRole('tab',{name:'持仓',exact:true}).count(),0);
+    await page.screenshot({path:path.join(output,'history-details.png')});await close();
+    await page.evaluate(ref=>draw(ref),ref);state.view=view;
     const legacy={...ref,grid:{...grid,show_amounts:false}};
     state.view={...view,document:{...view.document,grid:legacy.grid}};
     await page.evaluate(ref=>draw(ref),legacy);assert.ok(!(await page.locator('.grid-share-card').innerText()).includes('517.9557'));

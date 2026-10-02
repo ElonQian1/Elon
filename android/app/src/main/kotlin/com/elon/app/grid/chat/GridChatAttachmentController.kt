@@ -18,6 +18,7 @@ internal class GridChatAttachmentController(private val activity: AppCompatActiv
     private val input: EditText, private val scope: () -> String?) {
     private val handler = Handler(Looper.getMainLooper())
     private val draft = GridChatDraft(SystemClock::elapsedRealtime)
+    private val history = com.elon.app.grid.history.GridHistoryPicker(activity)
     private var dialog: AlertDialog? = null
     private var epoch = 0L
     private var phase = "idle"
@@ -25,7 +26,7 @@ internal class GridChatAttachmentController(private val activity: AppCompatActiv
     fun status() = mapOf("schema" to "yilong.binance_grid_attachment.v1", "active" to (current === this),
         "phase" to phase, "row_count" to rowCount, "draft_present" to input.text.contains(GridChatDraft.BEGIN), "auto_refresh" to false)
     fun remove() {
-        epoch++; handler.removeCallbacksAndMessages(null); dialog?.dismiss(); dialog = null
+        epoch++; history.close(); handler.removeCallbacksAndMessages(null); dialog?.dismiss(); dialog = null
         write(draft.clear(input.text.toString())); phase = "idle"; rowCount = 0
     }
     fun activate() { current = this }
@@ -38,7 +39,7 @@ internal class GridChatAttachmentController(private val activity: AppCompatActiv
     }
     fun validateSend(text: String): Boolean {
         if (!text.contains(GridChatDraft.BEGIN)) return true
-        val source = BinanceHostRuntime.onMain(activity, BinanceGridReader::context)
+        val source = BinanceHostRuntime.onMain(activity) { if (draft.historical) BinanceGridReader.identity(it) else BinanceGridReader.context(it) }
         val error = draft.validate(text, scope(), source) ?: return true
         showError(error); return false
     }
@@ -56,10 +57,28 @@ internal class GridChatAttachmentController(private val activity: AppCompatActiv
         if (input.text.contains(GridChatDraft.BEGIN)) {
             dialog = AlertDialog.Builder(activity).setTitle("已附带网格")
                 .setMessage("快照已显示在输入框中。发送前会核对来源和有效期；发送按钮不会刷新币安数据。")
-                .setPositiveButton("重新读取") { _, _ -> write(draft.clear(input.text.toString())); readList() }
+                .setPositiveButton("重新读取") { _, _ -> write(draft.clear(input.text.toString())); choose() }
                 .setNeutralButton("移除快照") { _, _ -> write(draft.clear(input.text.toString())) }
                 .setNegativeButton("返回", null).show()
-        } else readList()
+        } else choose()
+    }
+    private fun choose() {
+        dialog = AlertDialog.Builder(activity).setTitle("附带币安网格")
+            .setItems(arrayOf("运行中", "已结束 · 历史记录")) { _, index -> if(index == 0) readList() else readHistory() }
+            .setNegativeButton("取消", null).show()
+    }
+    private fun readHistory() {
+        val target = scope() ?: return showError("chat_not_ready")
+        val run = ++epoch; phase = "reading_history"
+        history.open({ run == epoch && scope() == target && !activity.isFinishing && !activity.isDestroyed }) { snapshot ->
+            val block = draft.stageHistory(target, snapshot.source, snapshot.observed, snapshot.fields)
+            phase = "preview"
+            dialog = AlertDialog.Builder(activity).setTitle("历史网格预览").setMessage(block)
+                .setPositiveButton("加入输入框") { _, _ ->
+                    if(run != epoch || scope() != target) { showError("context_changed"); return@setPositiveButton }
+                    write(GridChatDraft.strip(input.text.toString()).trimEnd() + "\n\n" + block); phase = "attached"
+                }.setNegativeButton("取消", null).show()
+        }
     }
     private fun readList() {
         val target = scope() ?: return showError("chat_not_ready")

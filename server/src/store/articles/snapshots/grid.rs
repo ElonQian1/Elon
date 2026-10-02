@@ -69,7 +69,7 @@ impl GridShare {
         if self.schema != "yilong.grid_share.v1"
             || self.observed_at_ms < 0
             || self.observed_at_ms > now + 5000
-            || self.fields.len() > 30
+            || self.fields.len() > 45
         {
             return Err(invalid());
         }
@@ -91,6 +91,21 @@ impl GridShare {
             }
             let valid = match key.as_str() {
                 "symbol" => true,
+                "recordKind" => value == "HISTORY",
+                "settlement" => matches!(value.as_str(), "UNKNOWN" | "CONFIRMED"),
+                "positionState" => matches!(value.as_str(), "UNKNOWN" | "OPEN" | "CLOSED"),
+                "endReason" => matches!(
+                    value.as_str(),
+                    "UNKNOWN" | "MANUAL" | "TAKE_PROFIT" | "STOP_LOSS" | "LIQUIDATION"
+                ),
+                "feeBasis" => matches!(value.as_str(), "UNKNOWN" | "INCLUDED" | "EXCLUDED"),
+                "roiBasis" => matches!(value.as_str(), "UNKNOWN" | "INITIAL" | "SOURCE"),
+                "created" | "end" => {
+                    value
+                        .parse::<i64>()
+                        .is_ok_and(|n| n > 0 && n <= self.observed_at_ms + 5000)
+                        && value.bytes().all(|v| v.is_ascii_digit())
+                }
                 "direction" => matches!(value.as_str(), "LONG" | "SHORT" | "NEUTRAL"),
                 "spacing" => matches!(value.as_str(), "ARITH" | "GEO"),
                 "status" => value
@@ -107,6 +122,36 @@ impl GridShare {
                 _ => false,
             };
             if !valid {
+                return Err(invalid());
+            }
+        }
+        if let (Some(start), Some(end)) = (self.fields.get("created"), self.fields.get("end")) {
+            if start.parse::<i64>().unwrap_or(i64::MAX) > end.parse::<i64>().unwrap_or(0) {
+                return Err(invalid());
+            }
+        }
+        if self
+            .fields
+            .get("recordKind")
+            .is_some_and(|v| v == "HISTORY")
+        {
+            if self
+                .fields
+                .get("status")
+                .is_some_and(|v| matches!(v.as_str(), "NEW" | "WORKING" | "RUNNING"))
+            {
+                return Err(invalid());
+            }
+            if self
+                .fields
+                .get("settlement")
+                .is_some_and(|v| v == "CONFIRMED")
+                && (!self.fields.contains_key("totalPnl")
+                    || self
+                        .fields
+                        .get("positionState")
+                        .is_none_or(|v| v != "CLOSED"))
+            {
                 return Err(invalid());
             }
         }
@@ -154,11 +199,20 @@ impl GridShare {
 
     pub(super) fn title(&self) -> String {
         format!(
-            "{} 网格快照",
+            "{} {}",
             self.fields
                 .get("symbol")
                 .map(String::as_str)
-                .unwrap_or("币安")
+                .unwrap_or("币安"),
+            if self
+                .fields
+                .get("recordKind")
+                .is_some_and(|v| v == "HISTORY")
+            {
+                "历史网格"
+            } else {
+                "网格快照"
+            }
         )
     }
     pub(super) fn summary(&self) -> String {

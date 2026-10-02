@@ -13,12 +13,12 @@ internal object GridSharePresentation {
         if (amount.signum() != 0 && rounded.signum() == 0) return if (amount.signum() > 0) "<0.00000001" else "−<0.00000001"
         return (if (signed && amount.signum() > 0) "+" else "") + rounded.toPlainString()
     }
-    fun token(symbol: String) = symbol.removeSuffix("USDT").removeSuffix("USDC").removeSuffix("BUSD").takeIf { it.matches(Regex("[A-Z0-9]{1,24}")) } ?: "?"
+    fun token(symbol: String) = symbol.removeSuffix("USDT").removeSuffix("USDC").removeSuffix("BUSD").takeIf { it.matches(Regex(com.elon.app.grid.BinanceSymbols.BASE)) } ?: "?"
     fun raw(grid: JSONObject, key: String): String? {
         if (!grid.optBoolean("show_amounts") && key in GridShareModel.amounts) return null
         return grid.optJSONObject("fields")?.optString(key)?.takeIf { it.isNotBlank() }
     }
-    fun metric(grid: JSONObject) = listOf("roi", "totalPnl", "profit").firstOrNull { number(raw(grid, it)) != null }
+    fun metric(grid: JSONObject) = (if(raw(grid,"recordKind") == "HISTORY") listOf("totalPnl") else listOf("roi", "totalPnl", "profit")).firstOrNull { number(raw(grid, it)) != null }
     fun range(grid: JSONObject): Float? {
         val low = number(raw(grid, "lower")) ?: return null
         val high = number(raw(grid, "upper")) ?: return null

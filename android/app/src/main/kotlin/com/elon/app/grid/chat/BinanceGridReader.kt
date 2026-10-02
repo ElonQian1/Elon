@@ -14,7 +14,12 @@ internal object BinanceGridReader {
         var context: BinanceGridReadStore.Context? = null, var detailBaseline: Long? = null)
     private var job: Job? = null
     fun context(host: BinanceHostRuntime): BinanceGridReadStore.Context? {
-        if (!host.live() || !host.state.fresh() || host.switchingAccount || !host.adapterBound) return null
+        if (!host.state.fresh()) return null
+        return identity(host)
+    }
+    /** Historical attachments retain their observation; this only checks the live source identity. */
+    fun identity(host: BinanceHostRuntime): BinanceGridReadStore.Context? {
+        if (!host.live() || !host.state.ready || host.switchingAccount || !host.adapterBound) return null
         return BinanceGridReadStore.Context(host.owner() ?: return null, host.state.account ?: return null,
             host.state.accountKind, host.document.snapshot().documentToken)
     }

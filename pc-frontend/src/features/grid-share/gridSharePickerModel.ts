@@ -1,6 +1,6 @@
 import type { GridFacts } from '../grid-chat/gridChatSnapshot'
 
-export type GridSort = 'profit-desc' | 'profit-asc' | 'symbol'
+export type GridSort = 'profit-desc' | 'profit-asc' | 'symbol' | 'ended-desc'
 const decimal = /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/
 export function knownDecimal(value: unknown): value is string { return typeof value === 'string' && decimal.test(value) }
 function units(value: string): bigint {
@@ -24,6 +24,7 @@ export function selectGridRows(rows: GridFacts[], query: string, sort: GridSort)
   const search = query.trim().toLocaleUpperCase()
   const result = rows.filter(row => !search || `${row.symbol} ${row.id}`.toLocaleUpperCase().includes(search))
   return result.sort((a, b) => {
+    if (sort === 'ended-desc') return Number(b.end ?? 0) - Number(a.end ?? 0) || (a.id ?? '').localeCompare(b.id ?? '')
     if (sort !== 'symbol') {
       const ak = knownDecimal(a.profit), bk = knownDecimal(b.profit)
       if (ak !== bk) return ak ? -1 : 1

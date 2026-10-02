@@ -51,7 +51,12 @@ impl Store {
             return Err(fail(413, "Snapshot owner quota exceeded"));
         }
         if let Some(grid) = &document.grid {
-            if chrono::Utc::now().timestamp_millis() - grid.observed_at_ms > 300_000 {
+            if grid
+                .fields
+                .get("recordKind")
+                .is_none_or(|kind| kind != "HISTORY")
+                && chrono::Utc::now().timestamp_millis() - grid.observed_at_ms > 300_000
+            {
                 return Err(fail(400, "Grid snapshot expired; read again"));
             }
             grid_versions::validate_previous(&tx, user, group, grid)?;

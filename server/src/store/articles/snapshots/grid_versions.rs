@@ -73,5 +73,5 @@ pub(crate) fn ai_context(
         .grid
         .ok_or_else(|| fail(400, "Grid snapshot unavailable"))?;
     Ok(Some(serde_json::json!({"snapshot_id":id,"grid":grid,
-        "scope":"Published historical snapshot only; missing values are unknown, never zero. Private account and live positions were not accessed."})))
+        "scope":"Published historical snapshot only; missing values are unknown, never zero. Private account and live positions were not accessed. HISTORY means an ended strategy, not proof of closed positions or final settlement. profit is gridProfit, never final total PnL. Fee inclusion and ROI denominator must be known before recomputing; do not double-count fees. Cash flows, adjustments, complete fills and equity curve are unavailable unless supplied. Never infer maximum drawdown or current holdings from this snapshot."})))
 }

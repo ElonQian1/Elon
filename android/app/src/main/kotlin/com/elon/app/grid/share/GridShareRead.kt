@@ -47,4 +47,5 @@ internal class GridShareRead(private val activity: AppCompatActivity) {
         return GridSharePositions.read(activity, Snapshot(fields, response["observed_at_ms"] as Long, source))
     }
     fun context() = BinanceHostRuntime.onMain(activity, BinanceGridReader::context)
+    fun historyContext() = BinanceHostRuntime.onMain(activity, BinanceGridReader::identity)
 }

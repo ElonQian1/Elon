@@ -10,6 +10,7 @@ export const labels: Record<string, string> = {
   profit: '网格利润 (USDT)', matchedPnl: '已配对收益 (USDT)', fundingFee: '资金费 (USDT)', fee: '手续费 (USDT)',
   positionQty: '实际持仓数量', positionNotional: '持仓货值 (USDT)', totalPnl: '策略总盈亏 (USDT)', unrealizedPnl: '未实现盈亏 (USDT)',
   matchedCount: '配对次数', marginType: '保证金模式', orderCurrency: '下单计量', stopUpper: '止损上限', stopLower: '止损下限',
+  recordKind: '记录类型', created: '开始时间', end: '结束时间', settlement: '收益结算', positionState: '结束时仓位', endReason: '结束原因', feeBasis: '手续费口径', roiBasis: '收益率分母',
 }
 export interface GridShare { schema: 'yilong.grid_share.v1'; observed_at_ms: number; show_amounts: boolean; fields: Record<string, string>; note?: string; previous_snapshot_id?: string }
 export interface GridShareCard { schema: string; provider: 'binance'; snapshot_id: string; group_id: string; title: string; summary: string; sender_name?: string; grid: GridShare }
@@ -17,11 +18,14 @@ export interface GridShareView { snapshot_id: string; group_id: string; owner_id
 export function value(grid: GridShare, key: string) {
   if (!grid.show_amounts && amountKeys.includes(key as typeof amountKeys[number])) return '未公开'
   const v = grid.fields[key]
+  if (key === 'end' || key === 'created') return v && /^[1-9][0-9]{0,15}$/.test(v) ? new Date(Number(v)).toLocaleString() : '未读取'
+  const words: Record<string, string> = { HISTORY: '已结束网格', UNKNOWN: '未确认', CONFIRMED: '已确认', CLOSED: '已平仓', OPEN: '保留仓位', CANCELED: '已结束', CANCELLED: '已结束', MANUAL: '手动结束', TAKE_PROFIT: '止盈结束', STOP_LOSS: '止损结束', LIQUIDATION: '强平结束', EXPIRED: '已终止', STOPPED: '已停止', INCLUDED: '已包含', EXCLUDED: '未包含', INITIAL: '初始投入', SOURCE: '币安原始口径' }
+  if (words[v]) return words[v]
   return ({ LONG: '做多', SHORT: '做空', NEUTRAL: '中性', ARITH: '等差', GEO: '等比', CROSSED: '全仓', ISOLATED: '逐仓', BASE: '基础币', QUOTE: '报价币', WORKING: '运行中', NEW: '运行中' } as Record<string, string>)[v] ?? v ?? '未读取'
 }
 export function shareDocument(grid: GridShare) {
   const get = (key: string) => grid.fields[key] ?? '未读取'
-  return { schema: SHARE_SCHEMA, provider: 'binance', title: `${get('symbol')} 网格快照`,
+  return { schema: SHARE_SCHEMA, provider: 'binance', title: `${get('symbol')} ${grid.fields.recordKind === 'HISTORY' ? '历史网格' : '网格快照'}`,
     summary: `${value(grid, 'direction') === '未读取' ? '方向未读取' : value(grid, 'direction')} · ${get('leverage')}× · ${get('lower')}–${get('upper')} · ${get('count')} 格 · 历史快照`, messages: [], grid }
 }
 export function publicGrid(attachment: GridAttachment, showAmounts = true, note = '', previous?: string): GridShare {
@@ -39,6 +43,7 @@ export function gridCard(content: string): GridShareCard | null {
   } catch { return null }
 }
 export const detailSections: Record<string, string[]> = {
+  '历史': ['created', 'end', 'status', 'positionState', 'settlement', 'endReason', 'feeBasis', 'roiBasis'],
   '持仓': ['positionQty', 'positionNotional', 'entryPrice', 'markPrice', 'liquidationPrice', 'marginType'],
   '收益': ['roi', 'totalPnl', 'profit', 'matchedPnl', 'unrealizedPnl', 'fundingFee', 'fee', 'matchedCount'],
   '参数': ['direction', 'leverage', 'lower', 'upper', 'count', 'spacing', 'investment', 'initialNotional', 'perGridQty', 'perGridQuoteQty', 'orderCurrency', 'stopUpper', 'stopLower'],

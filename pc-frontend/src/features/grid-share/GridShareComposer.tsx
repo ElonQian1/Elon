@@ -12,6 +12,9 @@ import { readSharePositions, type ShareReadSnapshot } from './readSharePositions
 import styles from './GridShare.module.css'
 import GridSharePicker from './GridSharePicker'
 import { displayProfit, profitTone } from './gridSharePickerModel'
+import { readGridHistory } from '../grid-history/readGridHistory'
+import { historicalAttachment } from '../grid-history/gridHistoryModel'
+import GridHistoryControls from '../grid-history/GridHistoryControls'
 
 interface Props { owner: string; group: string; title: string; previous?: string; onClose: () => void; onSent: () => void }
 export function GridShareComposeDialog(props: Props) {
@@ -34,19 +37,34 @@ export function GridShareComposeDialog(props: Props) {
     try {
       const port = gridReadPort(ownerKey)
       if (id && selection) {
-        const result = await readSharePositions(ownerKey, await readGridAttachment(port, selection, id, scope, active), active)
+        if (selection.recordKind === 'HISTORY' && (!sameGridSource(gridSource(await port.get()), selection.source) || !active())) throw Error('币安来源已变化，请重新读取历史')
+        const result = selection.recordKind === 'HISTORY' ? historicalAttachment(selection, id, scope) : await readSharePositions(ownerKey, await readGridAttachment(port, selection, id, scope, active), active)
         if (active()) { setAttachment(result); setSelection(null) }
       } else {
         const result = await readGridSelection(port, active)
         if (props.previous) {
           const binding = readBinding(props.owner, props.group, props.previous)
           if (!binding || !matchesBinding(binding, result.source)) throw Error('此设备没有原网格的账户绑定，请在原分享设备和原币安账户更新；可另行分享新卡片')
-          if (!result.rows.some(row => row.id === binding.strategy)) throw Error('原网格已不在运行列表，不能用另一条网格替代更新')
+          if (!result.rows.some(row => row.id === binding.strategy)) throw Error('原网格已不在运行列表。请读取已结束网格，选择同一策略更新。')
           const next = await readSharePositions(ownerKey, await readGridAttachment(port, result, binding.strategy, scope, active), active)
           if (active()) setAttachment(next)
         } else if (active()) setSelection(result)
       }
     } catch (reason) { if (active()) setError((reason as Error).message) }
+    finally { flight.current = false; if (active()) setBusy(false) }
+  }
+  async function history(days: number, page: number) {
+    if (!available || flight.current) return
+    flight.current = true; attempted.current = false; setBusy(true); setError(''); setAttachment(null)
+    try {
+      const next = await readGridHistory(ownerKey, days, page, active, page > 1 ? selection?.source : undefined)
+      if (props.previous) {
+        const binding = readBinding(props.owner, props.group, props.previous)
+        if (!binding || !matchesBinding(binding, next.source)) throw Error('请使用原分享设备与原币安账户更新')
+        next.rows = next.rows.filter(row => row.id === binding.strategy)
+      }
+      if (active()) setSelection(next)
+    } catch (reason) { if (active()) { setSelection(null); setError((reason as Error).message) } }
     finally { flight.current = false; if (active()) setBusy(false) }
   }
   async function submit() {
@@ -55,7 +73,7 @@ export function GridShareComposeDialog(props: Props) {
     try {
       const source = gridSource(await gridReadPort(ownerKey).get())
       if (!active() || !sameGridSource(source, attachment.source)) throw Error('币安账号或页面已变化，请重新读取')
-      if (!attempted.current && Date.now() - attachment.observedAtMs > 300_000) throw Error('快照已超过五分钟，请重新读取')
+      if (!attempted.current && attachment.facts.recordKind !== 'HISTORY' && Date.now() - attachment.observedAtMs > 300_000) throw Error('快照已超过五分钟，请重新读取')
       attempted.current = true
       const result = await publishShare(props.group, publicGrid(attachment, true, withNote ? note : '', props.previous), control.current.signal)
       if (active()) { rememberShare(props.owner, props.group, result.snapshot_id, attachment); props.onSent(); props.onClose() }
@@ -69,12 +87,13 @@ export function GridShareComposeDialog(props: Props) {
     {!available && <p className={styles.notice}>请在已登录同一一龙账号的 Win 客户端读取币安网格。</p>}
     <div className={styles.actions}><button type="button" disabled={busy || !available} onClick={() => void read()}>{attachment ? '重新读取' : '读取当前币安网格'}</button><button type="button" disabled={busy || !available} onClick={() => void openExchangeWebSession('binance', ownerKey).catch(() => setError('币安官网打开失败，请检查客户端'))}>打开币安官网</button></div>
     {busy && <p role="status">正在处理，请稍候…</p>}
-    {selection && <GridSharePicker selection={selection} busy={busy} onSelect={id => void read(id)} />}
+    <GridHistoryControls selection={selection} busy={busy || !available} read={(days, page) => void history(days, page)} />
+    {selection && <GridSharePicker key={selection.recordKind ?? 'RUNNING'} selection={selection} busy={busy} onSelect={id => void read(id)} />}
     {attachment && <section className={styles.privateMetrics} aria-label="本次公开的收益">
       <small>已公开金额与数量 · 群成员将看到以下数据</small>
-      <div>{(['profit', 'unrealizedPnl'] as const).map(key => {
+      <div>{(attachment.facts.recordKind === 'HISTORY' ? ['profit', 'totalPnl'] as const : ['profit', 'unrealizedPnl'] as const).map(key => {
         const metric = (attachment.facts as Record<string, string | null>)[key]
-        return <span key={key}>{key === 'profit' ? '网格利润' : '未实现盈亏'}<strong data-tone={profitTone(metric)}>{displayProfit(metric)}{metric ? ' USDT' : ''}</strong></span>
+        return <span key={key}>{key === 'profit' ? '网格利润' : key === 'totalPnl' ? '结束记录总盈亏' : '未实现盈亏'}<strong data-tone={profitTone(metric)}>{displayProfit(metric)}{metric ? ' USDT' : ''}</strong></span>
       })}</div>
     </section>}
     {attachment && <><div className={styles.options}><label><input type="checkbox" checked={withNote} disabled={busy} onChange={e => setWithNote(e.target.checked)} />附加个人说明</label>{withNote && <textarea aria-label="个人说明" maxLength={200} value={note} disabled={busy} onChange={e => setNote(e.target.value)} />}</div><div className={styles.card}><GridShareSummary grid={publicGrid(attachment, true)} /></div><p className={styles.notice}>仅分享此次快照。接收者无法操作你的币安账户；未读取的持仓与收益不会推算。{props.previous ? '将发送一张新卡片，旧内容保留。' : ''}</p></>}

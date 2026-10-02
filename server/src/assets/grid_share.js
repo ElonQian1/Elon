@@ -20,6 +20,10 @@
       const fields=ref.grid.fields||{},symbol=String(fields.symbol||'未读取').slice(0,40);
       const direction={LONG:'做多',SHORT:'做空',NEUTRAL:'中性'}[fields.direction]||'方向未读取';
       const leverage=/^\d{1,3}(?:\.\d{1,2})?$/.test(String(fields.leverage))?' '+fields.leverage+'×':'';
+      if(fields.recordKind==='HISTORY'){
+        const key=fields.totalPnl!=null?'totalPnl':'profit',label=key==='totalPnl'?'总盈亏':'网格利润（非总盈亏）';
+        return '[历史网格] '+symbol+' · 已结束 · '+label+' '+(ref.grid.show_amounts===true?root.ElonGridShareView.compact(fields[key],true):'未公开');
+      }
       return '[网格快照] '+symbol+' · '+direction+leverage;
     } catch { return null; }
   }

@@ -25,6 +25,7 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
     private val quote: (ChatMessage) -> Unit, private val analyze: (ChatMessage) -> Unit) {
     private val api = GridShareApi(activity, http, server)
     private val read = GridShareRead(activity)
+    private val history = com.elon.app.grid.history.GridHistoryPicker(activity)
     private val picker = AiConversationShareTargetPicker(activity, http, server)
     private val bindings = activity.getSharedPreferences("grid_share_bindings", 0)
     private var dialog: AlertDialog? = null
@@ -36,7 +37,29 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
     fun available() = group() != null && AuthManager.isLoggedIn(activity)
     private fun bindingKey(target: String, id: String) = "$server|${AuthManager.userId(activity)}|$target|$id"
     private fun active(run: Int, session: String) = epoch == run && socialSession(activity) == session && !activity.isFinishing && !activity.isDestroyed
-    fun open() { if (available()) picker.show { target -> load(target, null) } }
+    fun open() { if (available()) picker.show { target -> choose(target, null) } }
+    private fun choose(target: AiConversationShareTarget, previous: String?) {
+        close()
+        dialog = AlertDialog.Builder(activity).setTitle("分享币安网格")
+            .setItems(arrayOf("运行中", "已结束 · 历史记录")) { _, index ->
+                if (index == 0) load(target, previous) else loadHistory(target, previous)
+            }.setNegativeButton("取消", null).show()
+    }
+    private fun loadHistory(target: AiConversationShareTarget, previous: String?) {
+        close(); attempted = false; val run = epoch; val session = socialSession(activity)
+        history.open({ active(run, session) }) { snapshot ->
+            if (!active(run, session)) return@open
+            if (previous != null) {
+                val binding = bindings.getString(bindingKey(target.id, previous), null)?.let(::JSONObject)
+                if (binding == null || binding.optString("account") != snapshot.source.account || binding.optString("kind") != snapshot.source.kind || binding.optString("strategy") != snapshot.fields["id"]) {
+                    toast("只能关联原账户、原策略的结束记录"); return@open
+                }
+            }
+            preview = GridSharePreview(activity, snapshot, target.name, previous, submit = { grid ->
+                if (active(run, session)) publish(target, snapshot, grid, run, session)
+            }, close = { preview = null })
+        }
+    }
     private fun load(target: AiConversationShareTarget, previous: String?) {
         close(); attempted = false; val run = epoch; val session = socialSession(activity)
         dialog = AlertDialog.Builder(activity).setTitle("读取当前币安网格").setMessage("正在读取手机当前账户…")
@@ -86,7 +109,8 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
         catch (failure: Exception) { if (active(run, session)) { dialog?.dismiss(); dialog = null; toast(failure.message ?: "详情读取失败") } }
     }
     private fun publish(target: AiConversationShareTarget, snapshot: GridShareRead.Snapshot, grid: JSONObject, run: Int, session: String) {
-        if (read.context() != snapshot.source || !attempted && System.currentTimeMillis() - snapshot.observed > 300_000) {
+        val historical = snapshot.fields["recordKind"] == "HISTORY"
+        if ((if (historical) read.historyContext() else read.context()) != snapshot.source || !attempted && !historical && System.currentTimeMillis() - snapshot.observed > 300_000) {
             preview?.failed("币安来源已变化或快照超过五分钟，请取消并重新读取"); return
         }
         preview?.progress()
@@ -134,7 +158,7 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
                     body.addView(ui.button("询问群 AI") { if (active(run, session)) { close(); analyze(message) } })
                 } else body.addView(ui.text("引用最新版本请从群里的新卡片发起。", quiet = true))
                 if (view.optString("owner_id") == AuthManager.userId(activity)) {
-                    if (latest == null) body.addView(ui.button("手动更新快照") { if (active(run, session)) load(AiConversationShareTarget(target, "当前群聊"), id) })
+                    if (latest == null) body.addView(ui.button("手动更新快照") { if (active(run, session)) choose(AiConversationShareTarget(target, "当前群聊"), id) })
                     body.addView(ui.button("撤回分享") { if (active(run, session)) revoke(target, id, session) })
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -148,7 +172,7 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
             catch (failure: Exception) { toast(failure.message ?: "撤回未确认，请重试") }
         }
     }
-    private fun close() { epoch++; job?.cancel(); dialog?.dismiss(); dialog = null; preview?.close(); preview = null }
+    private fun close() { epoch++; job?.cancel(); history.close(); dialog?.dismiss(); dialog = null; preview?.close(); preview = null }
     fun dispose() { close(); picker.close(); if (current === this) current = null }
     private fun toast(text: String) = Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
     companion object { var current: GridShareFeature? = null; private set }

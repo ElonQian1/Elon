@@ -6302,6 +6302,204 @@
       "updated_at_ms": 1790911556634
     },
     {
+      "id": "binance-grid-history-share",
+      "title": "历史网格分享与复盘",
+      "summary": "复用历史报告，接通群卡、引用与本人 ChatGPT；公开金额，显式未知结算与收益口径。",
+      "status": "implemented",
+      "priority": "p2",
+      "requirement": {
+        "path": "docs/requirements/binance-grid-history-share.md",
+        "content_hash": "16a9ad90b4cde502d6b981c019b7b98f21d3f0887741e4402bc32071d844eade",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "33f049d5ad8883e3b60ddc04083d1497d0aca93c",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "grid-share",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/history",
+        "android/app/src/main/kotlin/com/elon/app/grid/share",
+        "pc-frontend/src/features/grid-history",
+        "pc-frontend/src/features/grid-share",
+        "server/src/assets/grid_share_view.js",
+        "server/src/store/articles/snapshots/grid.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "显式历史分页读取与来源保护",
+        "三端历史卡与引用同一记录",
+        "ChatGPT 历史上下文及缺失数据约束",
+        "收益口径与旧快照兼容"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/history/GridHistoryRead.kt",
+          "content_hash": "f2fcbfdcba597e85873e345a109adaf74f9342e42f7671a228295609745a4689",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dae57382b243c42e8cc2411121744592bca895d6",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/share/GridSharePresentation.kt",
+          "content_hash": "ee4a24851e03e34e7a808c36325761fb711bd0b30bb5fb13dcfc445b89be49c8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "6d5273b5908dddb58a58b5f292c4f0ca5def303d",
+            "worktree_blob_oid": "d604e30c2c4a5a21352c2dbf5e400c1f70f08baf",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/history/GridHistoryModelTest.kt",
+          "content_hash": "c04748f1304dec87a72fff5e6ae2debbb30d0a5d697ccde12a0e330784825ab5",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "29d4ad27ff8c9511dc4f23322a5d1fcd6022aeb8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/history/GridHistoryViewsTest.kt",
+          "content_hash": "8ae9dac7b3c70ebbf5c6f39375b1d2dce6285847fbe14413fe98b7ec0f85e983",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6119d8d5bbe1eb54926b2dc07b21d0607af20081",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/reports/grid-history-share-20261002.md",
+          "content_hash": "daac5e34f76e93af5945a6b5f7b391fa911455bfe9eef42a7e6a80889bcff4e5",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "339aa0acfa9744267b15e5a856913a81dbe9576a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-grid-history.cjs",
+          "content_hash": "806ab538cea28cd28b233cbce7d80e9f22b167e6a86eb6c20a53b16ed0772eec",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bd012231ef5122090bf0bbf717a922c864fdc93b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-history/gridHistoryModel.ts",
+          "content_hash": "7d5970456341610cf9daffe341f0f5b4e4100bd95cd71880aa8a24341923cc92",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6575f88c962db78342a896b8db3d99955ed37bc1",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-history/readGridHistory.ts",
+          "content_hash": "33f439ca69a4bffb479354bcd3f6a05b098305d1d3e571cd783e747aad822880",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9bbe1b3efe8ffe0064bf61550bebe8aaf87a78fc",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-grid-share-pwa.cjs",
+          "content_hash": "d8cd6716152bbe9cf99e4539349a13384c4918ffd30cf407ed748a8587f7ec88",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "a64db716bb15cfc9117dcadee158aa665a8cee88",
+            "worktree_blob_oid": "b29467ecd4db714e5430208b82599a54cfafe9ad",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/assets/grid_share_view.js",
+          "content_hash": "1738248277ac8570ffb95c71d9e52e94d8cfb72fae7963f4bc78502eb40df9db",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "87ea235e2fabc416e5a3c658f8085dd02879bd2d",
+            "worktree_blob_oid": "d0b8fb31c24f7bac4e5bbd2b5e3e28417e24daaa",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/articles/snapshots/grid.rs",
+          "content_hash": "48821e5a562b0ea27be47309ee9349889aebfbb0e20efcb244811aea9d456b4c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
+            "worktree_blob_oid": "cb243243b17a1373b8ee7593a889b293e004da12",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/store/articles/snapshots/grid_tests.rs",
+          "content_hash": "0719be343e455956cc65afb5f3d2e5db5c3f40d09c38cd1fdb37096153189ec3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7134fe07ca27e2586f893aa2d637b4d7ff8ebba6",
+            "head_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
+            "worktree_blob_oid": "9d76576fdf328e0feb01f2feb10a4f56dce99ccf",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1790930008305,
+      "updated_at_ms": 1790930038892
+    },
+    {
       "id": "binance-grid-observer-v1",
       "title": "币安网格被动观察工具",
       "summary": "复用已登录Chrome的独立MV3扩展，被动观察网格候选请求并导出有界脱敏结构；真实账号现场采样独立验收。",
@@ -33291,56 +33489,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_4d25e69ad142410a8c5ff4b2abe69883",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Shared and native source, actual React/PWA interactions and build checks implemented; native visual acceptance remains separate",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789550566650
-    },
-    {
-      "id": "feature_event_06c13d83d3ba400fbf56bc34202e6015",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789552393913
-    },
-    {
-      "id": "feature_event_10fd239d595a478486a5abfbe257c9df",
-      "feature_id": "social-link-readback-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789557244987
-    },
-    {
-      "id": "feature_event_b0586d754ab0436fac10226198f37961",
-      "feature_id": "social-link-readback-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789557332624
-    },
-    {
-      "id": "feature_event_cd3dd74f7a7b43c48c0cb8b0fb8d3d34",
-      "feature_id": "social-link-readback-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789557964454
-    },
-    {
       "id": "feature_event_65b474beac4449dbbe0d543d2c0ee33b",
       "feature_id": "social-link-readback-v1",
       "action": "evidence_recorded",
@@ -35289,6 +35437,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790926107355
+    },
+    {
+      "id": "feature_event_244a97fcea284d2db98a3d1ca81c46b5",
+      "feature_id": "binance-grid-history-share",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790930008305
+    },
+    {
+      "id": "feature_event_e6d2ef1dc716410dbca04bcb4bfd4192",
+      "feature_id": "binance-grid-history-share",
+      "action": "claimed",
+      "actor": "codex-grid-history",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790930008400
+    },
+    {
+      "id": "feature_event_b8ff8864f5414326a158f95fb8213cb0",
+      "feature_id": "binance-grid-history-share",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790930008494
+    },
+    {
+      "id": "feature_event_097b7405a9434da4ab400f1905899856",
+      "feature_id": "binance-grid-history-share",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790930013493
+    },
+    {
+      "id": "feature_event_6084e9acea6f46f99a2656583925c5bf",
+      "feature_id": "binance-grid-history-share",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "代码与 PC/APK/PWA/Rust 测试通过；真实非空历史记录及外发验收仍单独待确认。登记表冲突通过保留上游并重放官方工作流解决。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790930038892
     }
   ]
 }

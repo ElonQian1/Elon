@@ -31,11 +31,12 @@ internal class GridShareViews(private val context: Context) {
         addView(text(value, 14f).apply { setTextColor(tint); gravity = Gravity.END; typeface = Typeface.DEFAULT_BOLD }, LinearLayout.LayoutParams(0, -2, 1.25f))
     }
     fun summary(grid: JSONObject): LinearLayout = s.column().apply {
+        val historical = raw(grid, "recordKind") == "HISTORY"
         val tint = s.direction(raw(grid, "direction"))
         background = s.panel(border = s.color(R.color.mobile_outline_variant))
         addView(s.row().apply {
-            addView(text("◆ 币安 · 网格快照", 12f).apply { setTextColor(s.color(R.color.mobile_warning)) }, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(s.pill("历史快照", s.muted))
+            addView(text(if(historical) "◆ 币安 · 历史网格" else "◆ 币安 · 网格快照", 12f).apply { setTextColor(s.color(R.color.mobile_warning)) }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(s.pill(if(historical) "已结束" else "采集快照", s.muted))
         })
         addView(s.spaced(s.row().apply {
             val symbol = GridShareModel.value(grid, "symbol")
@@ -54,31 +55,35 @@ internal class GridShareViews(private val context: Context) {
         addView(s.spaced(s.column(12).apply {
             val metricTint = if (metric != null) s.tone(raw(grid, metric)) else s.muted
             background = s.panel(androidx.core.graphics.ColorUtils.blendARGB(s.surface, metricTint, .08f), 12)
-            addView(text(when (metric) { "roi" -> "策略总收益率"; "totalPnl" -> "策略总盈亏 · USDT"; "profit" -> "网格利润 · USDT"; else -> "收益数据" }, 12f, true))
+            addView(text(if(historical) { if(raw(grid,"settlement") == "CONFIRMED") "最终总盈亏 · USDT" else "结束记录总盈亏 · 结算未确认" } else when (metric) { "roi" -> "策略总收益率"; "totalPnl" -> "策略总盈亏 · USDT"; "profit" -> "网格利润 · USDT"; else -> "收益数据" }, 12f, true))
             val amount = if (metric != null) GridSharePresentation.format(raw(grid, metric), true) + (if (metric == "roi") "%" else "")
                 else if (!grid.optBoolean("show_amounts")) "历史分享未公开金额" else "暂未读取"
             addView(text(amount, if (metric != null) 26f else 16f).apply { setTextColor(metricTint); typeface = Typeface.DEFAULT_BOLD })
             if (metric == "profit") addView(text("网格利润不代表策略总盈亏", 11f, true))
-            if (grid.optBoolean("show_amounts")) addView(pair("未实现盈亏 · USDT", GridSharePresentation.format(raw(grid, "unrealizedPnl"), true), s.tone(raw(grid, "unrealizedPnl"))))
+            if (grid.optBoolean("show_amounts")) addView(pair(if(historical) "网格利润（非总盈亏）" else "未实现盈亏 · USDT", GridSharePresentation.format(raw(grid, if(historical) "profit" else "unrealizedPnl"), true), s.tone(raw(grid, if(historical) "profit" else "unrealizedPnl"))))
         }))
         if (grid.optBoolean("show_amounts")) {
             addView(s.spaced(pair("投入保证金 · USDT", shown(grid, "investment"))))
-            addView(pair("持仓数量 · ${GridSharePresentation.token(GridShareModel.value(grid, "symbol"))}", shown(grid, "positionQty")))
-            addView(pair("持仓货值 · USDT", shown(grid, "positionNotional")))
+            if(!historical) {
+                addView(pair("持仓数量 · ${GridSharePresentation.token(GridShareModel.value(grid, "symbol"))}", shown(grid, "positionQty")))
+                addView(pair("持仓货值 · USDT", shown(grid, "positionNotional")))
+            }
         }
+        if(historical) { addView(pair("结束时间", GridShareModel.value(grid,"end"))); addView(pair("结束时仓位", shown(grid,"positionState"))); addView(pair("收益结算", shown(grid,"settlement"))) }
         addView(s.spaced(s.divider()))
-        addView(pair("价格区间", GridSharePresentation.rangeLabel(grid), s.primary))
+        addView(pair("价格区间", if(historical) "结束记录" else GridSharePresentation.rangeLabel(grid), s.primary))
         addView(s.row().apply {
             addView(text(shown(grid, "lower"), 13f), LinearLayout.LayoutParams(0, -2, 1f))
             addView(text(shown(grid, "upper"), 13f).apply { gravity = Gravity.END }, LinearLayout.LayoutParams(0, -2, 1f))
         })
-        addView(s.range(GridSharePresentation.range(grid)))
-        addView(text("标记价 ${shown(grid, "markPrice")}", 12f, quiet = true))
+        if(!historical) { addView(s.range(GridSharePresentation.range(grid))); addView(text("标记价 ${shown(grid, "markPrice")}", 12f, quiet = true)) }
         addView(s.spaced(s.divider()))
         addView(text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(grid.optLong("observed_at_ms"))) + " 采集", 11f, quiet = true))
         addView(text(if (grid.optBoolean("show_amounts")) "金额与数量全部公开" else "旧快照 · 金额与数量未公开", 11f).apply { setTextColor(s.primary) })
     }
     fun details(grid: JSONObject): View = s.column(0).apply {
+        val historical = raw(grid,"recordKind") == "HISTORY"
+        val sections = if(historical) linkedMapOf("历史" to listOf("created","end","status","positionState","settlement","endReason","feeBasis","roiBasis")) + GridShareModel.sections.filterKeys { it != "持仓" } else GridShareModel.sections
         val rows = s.column(0)
         val tabs = s.row().apply { background = s.panel(s.color(R.color.mobile_surface_container_high), 12); setPadding(dp(4), dp(4), dp(4), dp(4)) }
         val buttons = linkedMapOf<String, TextView>()
@@ -89,7 +94,7 @@ internal class GridShareViews(private val context: Context) {
                 button.background = s.panel(if (key == tab) s.color(R.color.mobile_primary_container) else s.color(R.color.mobile_surface_container_high), 8)
                 button.typeface = if (key == tab) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             }
-            GridShareModel.sections.getValue(tab).forEach { key ->
+            sections.getValue(tab).forEach { key ->
                 val tint = if (key in setOf("profit", "totalPnl", "roi", "matchedPnl", "unrealizedPnl", "fundingFee")) s.tone(raw(grid, key)) else s.ink
                 rows.addView(s.row().apply {
                     minimumHeight = dp(52); setPadding(dp(4), dp(8), dp(4), dp(8))
@@ -99,11 +104,12 @@ internal class GridShareViews(private val context: Context) {
                 rows.addView(s.divider())
             }
         }
-        GridShareModel.sections.keys.forEach { key ->
+        sections.keys.forEach { key ->
             val tab = text(key, 14f).apply { gravity = Gravity.CENTER; minHeight = dp(48); isFocusable = true; contentDescription = "网格详情：$key"; setOnClickListener { show(key) } }
             buttons[key] = tab; tabs.addView(tab, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        addView(s.spaced(tabs, 16)); addView(rows); show("持仓")
+        addView(s.spaced(tabs, 16)); addView(rows); show(if(historical) "历史" else "持仓")
+        if(historical) addView(text(com.elon.app.grid.history.GridHistoryModel.NOTICE, quiet = true))
     }
     companion object {
         fun bind(container: LinearLayout?, text: TextView, message: ChatMessage): Boolean {

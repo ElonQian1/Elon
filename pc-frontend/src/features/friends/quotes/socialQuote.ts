@@ -1,5 +1,6 @@
 import type { SocialAttachment, SocialMessage } from '../socialMessageTypes'
 import { gridCard } from '../../grid-share/gridShareModel'
+import { displayProfit } from '../../grid-share/gridSharePickerModel'
 
 export interface SocialQuote {
   message_id: string
@@ -32,6 +33,10 @@ export function quoteSummary(quote: SocialQuote): string {
   if (quote.unavailable) return '原消息已撤回或不可用'
   let text = splitSocialQuote({ content: quote.content }).body.trim()
   const grid = gridCard(text)
+  if (grid?.grid.fields.recordKind === 'HISTORY') {
+    const f = grid.grid.fields, key = f.totalPnl != null ? 'totalPnl' : 'profit'
+    return `[历史网格] ${f.symbol} · 已结束 · ${key === 'totalPnl' ? '总盈亏' : '网格利润（非总盈亏）'} ${grid.grid.show_amounts ? displayProfit(f[key]) : '未公开'}`
+  }
   if (grid) return `[网格快照] ${grid.title} · ${new Date(grid.grid.observed_at_ms).toLocaleString()}`
   if (/^【一龙(?:聊天记录|.*卡片)】/.test(text)) {
     const start = text.indexOf('{')

@@ -3,6 +3,7 @@
   'use strict';
   const { el, button } = root.ElonAiShareRich;
   const labels = {
+    recordKind:'记录类型',created:'开始时间',end:'结束时间',settlement:'收益结算',positionState:'结束时仓位',endReason:'结束原因',feeBasis:'手续费口径',roiBasis:'收益率分母',
     direction:'方向', leverage:'杠杆', lower:'区间下限', upper:'区间上限', count:'网格数量', spacing:'间距',
     markPrice:'标记价格', roi:'策略总收益率 (%)', entryPrice:'持仓均价', liquidationPrice:'预估强平价', positionQty:'实际持仓数量', positionNotional:'持仓货值 (USDT)',
     totalPnl:'策略总盈亏 (USDT)', unrealizedPnl:'未实现盈亏 (USDT)', profit:'网格利润 (USDT)', matchedPnl:'已配对收益 (USDT)', fee:'手续费 (USDT)', fundingFee:'资金费 (USDT)',
@@ -12,6 +13,7 @@
   const money = new Set(['positionQty','positionNotional','totalPnl','unrealizedPnl','profit','matchedPnl','fee','fundingFee','investment','initialNotional','perGridQty','perGridQuoteQty']);
   const gains = new Set(['roi','totalPnl','unrealizedPnl','profit','matchedPnl']);
   const words = {LONG:'做多',SHORT:'做空',NEUTRAL:'中性',ARITH:'等差',GEO:'等比',CROSSED:'全仓',ISOLATED:'逐仓',BASE:'基础币',QUOTE:'报价币',WORKING:'运行中',RUNNING:'运行中',NEW:'运行中'};
+  Object.assign(words,{HISTORY:'已结束网格',UNKNOWN:'未确认',CONFIRMED:'已确认',CLOSED:'已平仓',OPEN:'保留仓位',CANCELED:'已结束',CANCELLED:'已结束',MANUAL:'手动结束',TAKE_PROFIT:'止盈结束',STOP_LOSS:'止损结束',LIQUIDATION:'强平结束',EXPIRED:'已终止',STOPPED:'已停止',INCLUDED:'已包含',EXCLUDED:'未包含',INITIAL:'初始投入',SOURCE:'币安原始口径'});
   function raw(grid,key) {
     if (grid.show_amounts !== true && money.has(key)) return null;
     const item = grid.fields?.[key];
@@ -33,7 +35,9 @@
   }
   function value(grid,key) {
     if(grid.show_amounts !== true && money.has(key))return '未公开';
-    const item=raw(grid,key);return item == null || item === '' ? '未读取' : words[item] || item;
+    const item=raw(grid,key);
+    if(['end','created'].includes(key))return item && /^[1-9][0-9]{0,15}$/.test(item)?new Date(Number(item)).toLocaleString():'未读取';
+    return item == null || item === '' ? '未读取' : words[item] || item;
   }
   function time(grid) {
     const date=new Date(grid.observed_at_ms);
@@ -50,8 +54,9 @@
     return holder;
   }
   function metric(grid) {
-    const key=['roi','totalPnl','profit'].find(key=>numeric(raw(grid,key)));
-    return key?{key,label:labels[key],value:raw(grid,key)}:null;
+    const historical=raw(grid,'recordKind')==='HISTORY';
+    const key=(historical?['totalPnl']:['roi','totalPnl','profit']).find(key=>numeric(raw(grid,key)));
+    return key?{key,label:historical?(raw(grid,'settlement')==='CONFIRMED'?'最终总盈亏 (USDT)':'结束记录总盈亏 · 结算未确认'):labels[key],value:raw(grid,key)}:null;
   }
   function stat(grid,key,label) {
     const item=raw(grid,key),cell=el('span',null,'grid-share-stat');
@@ -73,8 +78,9 @@
     wrap.append(el('small','价格区间 · '+state),bar,bounds,el('small','标记价 '+compact(raw(grid,'markPrice'))));return wrap;
   }
   function summary(grid) {
+    const historical=raw(grid,'recordKind')==='HISTORY';
     const card=el('span',null,'grid-share-summary');
-    const source=el('span','币安 · 网格持仓分享','grid-share-source');
+    const source=el('span',historical?'币安 · 历史网格':'币安 · 网格持仓分享','grid-share-source');
     const heading=el('span',null,'grid-share-heading'),title=el('span',null,'grid-share-title');
     title.append(el('strong',value(grid,'symbol')),el('small',value(grid,'count')+' 格 · '+value(grid,'spacing')));
     heading.append(icon(raw(grid,'symbol')),title);
@@ -82,27 +88,30 @@
     const direction=raw(grid,'direction');tags.append(el('span',value(grid,'direction'),'grid-share-tag grid-share-'+(direction==='LONG'?'positive':direction==='SHORT'?'negative':'neutral')),el('span',value(grid,'leverage')+'×','grid-share-tag'));
     if(raw(grid,'status'))tags.append(el('span',value(grid,'status'),'grid-share-tag'));
     const hero=metric(grid),panel=el('span',null,'grid-share-profit grid-share-'+tone(hero?.value));
-    panel.append(el('small',hero?.label || (grid.show_amounts===true?'收益未读取':'历史分享未公开金额')),el('b',hero?compact(hero.value,true)+(hero.key==='roi'?'%':''):'等待完整数据','grid-share-profit-value'));
+    panel.append(el('small',hero?.label || (grid.show_amounts===true?historical?'最终总盈亏未读取':'收益未读取':'历史分享未公开金额')),el('b',hero?compact(hero.value,true)+(hero.key==='roi'?'%':''):historical?'未读取':'等待完整数据','grid-share-profit-value'));
     if(hero)panel.title=hero.value;
     if(hero?.key==='profit')panel.append(el('small','网格利润不代表策略总盈亏'));
     card.append(source,heading,tags,panel);
-    if(grid.show_amounts===true){const stats=el('span',null,'grid-share-stats');[['unrealizedPnl','未实现盈亏 · USDT'],['investment','投入保证金 · USDT'],['positionQty','持仓数量'],['positionNotional','持仓货值 · USDT']].forEach(([key,label])=>stats.append(stat(grid,key,label)));card.append(stats);}
-    card.append(range(grid),el('small',time(grid),'grid-share-time'),el('small',grid.show_amounts===true?'金额与数量已公开':'历史分享未公开金额','grid-share-disclosure'));
+    if(grid.show_amounts===true){const stats=el('span',null,'grid-share-stats');(historical?[['profit','网格利润（非总盈亏）· USDT'],['investment','投入保证金 · USDT']]:[['unrealizedPnl','未实现盈亏 · USDT'],['investment','投入保证金 · USDT'],['positionQty','持仓数量'],['positionNotional','持仓货值 · USDT']]).forEach(([key,label])=>stats.append(stat(grid,key,label)));card.append(stats);}
+    if(historical)card.append(el('small','结束 '+value(grid,'end')),el('small','仓位：'+value(grid,'positionState')+' · 结算：'+value(grid,'settlement')));else card.append(range(grid));
+    card.append(el('small',time(grid),'grid-share-time'),el('small',grid.show_amounts===true?'金额与数量已公开':'历史分享未公开金额','grid-share-disclosure'));
     return card;
   }
   function details(grid) {
+    const selectedSections=raw(grid,'recordKind')==='HISTORY'?{历史:['created','end','status','positionState','settlement','endReason','feeBasis','roiBasis'],收益:sections.收益,参数:sections.参数}:sections;
     const section=el('section',null,'grid-share-details'),tabs=el('div',null,'grid-share-tabs'),rows=el('dl',null,'grid-share-rows');
     tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','网格详情分区');rows.setAttribute('role','tabpanel');
-    const controls=Object.keys(sections).map(tab=>{
+    const controls=Object.keys(selectedSections).map(tab=>{
       const control=button(tab,()=>show(tab));control.setAttribute('role','tab');control.id='grid-share-tab-'+tab;control.setAttribute('aria-controls','grid-share-rows');return control;
     });
     function show(tab){
       controls.forEach(control=>{const selected=control.textContent===tab;control.setAttribute('aria-selected',String(selected));control.tabIndex=selected?0:-1;});
       rows.setAttribute('aria-labelledby','grid-share-tab-'+tab);rows.replaceChildren();
-      sections[tab].forEach(key=>{const dd=el('dd',value(grid,key),gains.has(key)?'grid-share-'+tone(raw(grid,key)):'');rows.append(el('dt',labels[key]),dd);});
+      selectedSections[tab].forEach(key=>{const dd=el('dd',value(grid,key),gains.has(key)?'grid-share-'+tone(raw(grid,key)):'');rows.append(el('dt',labels[key]),dd);});
     }
     tabs.addEventListener('keydown',event=>{const i=controls.indexOf(document.activeElement);if(i<0 || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?2:(i+(event.key==='ArrowRight'?1:2))%3;controls[next].click();controls[next].focus();});
-    rows.id='grid-share-rows';tabs.append(...controls);section.append(tabs,rows);show('持仓');
+    rows.id='grid-share-rows';tabs.append(...controls);section.append(tabs,rows);show(Object.keys(selectedSections)[0]);
+    if(raw(grid,'recordKind')==='HISTORY')section.append(el('p','网格利润不等于最终总盈亏。未确认的平仓、费用口径、追加撤出、调整明细和收益曲线不能推算为零；此记录不表示当前持仓。'));
     if(grid.note)section.append(el('blockquote',grid.note,'grid-share-note'));
     return section;
   }

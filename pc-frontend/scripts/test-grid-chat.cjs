@@ -35,7 +35,7 @@ function load(name) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, fileName: file,
   }).outputText
-  const requireMock = name => name === 'react' ? react : name.includes('exchangeWebviewApi') ? api : load(name)
+  const requireMock = name => name === 'react' ? react : name.includes('exchangeWebviewApi') ? api : name.startsWith('.') ? load(path.resolve(path.dirname(file),name)) : require(name)
   new Function('require', 'module', 'exports', code)(requireMock, module, module.exports)
   return module.exports
 }

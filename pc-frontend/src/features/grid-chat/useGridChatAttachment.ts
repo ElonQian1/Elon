@@ -3,7 +3,10 @@ import { isExchangeWebviewAvailable, openExchangeWebSession } from '../exchange-
 import type useLocalAiWebChatController from '../user-browser/useLocalAiWebChatController'
 import { gridReadPort, readGridAttachment, readGridSelection } from './readGridChatSnapshot'
 import type { GridAttachment, GridSelection } from './gridChatSnapshot'
+import { gridSource, sameGridSource } from './gridChatSnapshot'
 import { prepareGridChatSend } from './gridChatSend'
+import { readGridHistory } from '../grid-history/readGridHistory'
+import { historicalAttachment } from '../grid-history/gridHistoryModel'
 
 type ChatController = ReturnType<typeof useLocalAiWebChatController>
 interface Options { enabled: boolean; ownerKey: string; controller: ChatController }
@@ -49,7 +52,8 @@ export default function useGridChatAttachment({ enabled, ownerKey, controller }:
     try {
       const port = gridReadPort(ownerKey)
       if (id && selected) {
-        const next = await readGridAttachment(port, selected, id, scope, active)
+        if (selected.recordKind === 'HISTORY' && (!sameGridSource(gridSource(await port.get()), selected.source) || !active())) throw Error('币安来源已变化，请重新读取历史')
+        const next = selected.recordKind === 'HISTORY' ? historicalAttachment(selected, id, scope) : await readGridAttachment(port, selected, id, scope, active)
         if (active()) {
           attachmentRef.current = next
           setAttachment(next)
@@ -70,6 +74,17 @@ export default function useGridChatAttachment({ enabled, ownerKey, controller }:
     try { await openExchangeWebSession('binance', ownerKey) }
     catch { setError('无法打开币安官网，请检查 Win 客户端连接。') }
   }
+  async function readHistory(days = 30, page = 1) {
+    if (!targetReady || !scope || busy || controller.busyAction) return
+    const sequence = ++operation.current, prior = selection
+    const active = () => operation.current === sequence && currentScope.current === scope
+    attachmentRef.current = null; setAttachment(null); setBusy(true); setError('')
+    try {
+      const next = await readGridHistory(ownerKey, days, page, active, page > 1 ? prior?.source : undefined)
+      if (active()) setSelection(next)
+    } catch (reason) { if (active()) { setSelection(null); setError((reason as Error).message) } }
+    finally { if (active()) setBusy(false) }
+  }
   const run: ChatController['run'] = async (action, value, expectedDraft) => {
     if (action !== 'send_prompt') {
       if (['new_conversation', 'open_conversation', 'open_project'].includes(action)) remove()
@@ -88,18 +103,20 @@ export default function useGridChatAttachment({ enabled, ownerKey, controller }:
       return null
     }
     let prompt: string
+    sendFlight.current = true
     try {
+      if (pending.facts.recordKind === 'HISTORY' && (!sameGridSource(gridSource(await gridReadPort(ownerKey).get()), pending.source) || attachmentRef.current !== pending)) throw Error('币安来源已变化，请重新附带历史网格')
       prompt = prepareGridChatSend({ question: value ?? '', attachment: pending, scope: currentScope.current,
         setDraft: controller.setDraft, removeAttachment: remove })
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '无法准备网格附件。')
+      sendFlight.current = false
       return null
     }
-    sendFlight.current = true
     try { return await controller.run(action, prompt, expectedDraft) }
     finally { sendFlight.current = false }
   }
   return { available, canRead: targetReady && !controller.busyAction, attachment, selection, busy, error,
-    read, remove, openBinance, run }
+    read, readHistory, remove, openBinance, run }
 }
 export type GridChatAttachmentController = ReturnType<typeof useGridChatAttachment>
