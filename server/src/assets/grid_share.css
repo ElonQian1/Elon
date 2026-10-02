@@ -1,4 +1,7 @@
 /* Grid-only mobile V2 styling; global chat and other shared readers stay unchanged. */
+.chat-message-content>.bubble.grid-share-bubble,.social-message-compact .chat-message-content>.bubble.grid-share-bubble{width:326px;max-width:100%;min-width:0;padding:0;border:0;background:transparent;box-sizing:border-box}
+.grid-share-card,.grid-share-card *{box-sizing:border-box}
+.grid-share-card{min-width:0;max-width:100%;touch-action:pan-y;-webkit-touch-callout:none;user-select:none}
 .grid-share-card,.grid-share-reader{--grid-gold:var(--mobile-warning,#8b6e00);--grid-positive:var(--mobile-financial-positive,#146c3a);--grid-negative:var(--mobile-financial-negative,#b3261e);color:var(--mobile-on-surface);font:inherit;line-height:1.5}
 .ai-share-card.grid-share-card{display:block;width:100%;padding:18px;text-align:left;background:var(--mobile-surface-container);border:0;border-top:3px solid var(--grid-gold);border-radius:20px;color:var(--mobile-on-surface);white-space:normal;cursor:pointer}
 .grid-share-summary{display:flex;flex-direction:column;gap:14px;min-width:0;white-space:normal}
@@ -18,7 +21,7 @@
 .grid-share-profit{display:flex;flex-direction:column;gap:5px;padding:14px;border:1px solid var(--mobile-outline-variant);border-radius:16px;background:var(--mobile-surface-container-high)}
 .grid-share-profit.grid-share-positive{background:color-mix(in srgb,var(--grid-positive) 9%,var(--mobile-surface-container));border-color:color-mix(in srgb,var(--grid-positive) 28%,transparent)}
 .grid-share-profit.grid-share-negative{background:color-mix(in srgb,var(--grid-negative) 9%,var(--mobile-surface-container));border-color:color-mix(in srgb,var(--grid-negative) 28%,transparent)}
-.grid-share-profit .grid-share-profit-value{font-size:1.65rem;line-height:1.25;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.025em;overflow-wrap:anywhere}
+.grid-share-profit .grid-share-profit-value{font-size:1.375rem;line-height:1.25;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.025em;overflow-wrap:anywhere}
 .grid-share-stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 10px}
 .grid-share-stat{display:flex;flex-direction:column;gap:3px;min-width:0}
 .grid-share-stat b{font-size:.875rem;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
@@ -27,6 +30,7 @@
 .grid-share-range-fill{display:block;height:100%;border-radius:inherit;background:var(--mobile-primary)}
 .grid-share-range-dot{position:absolute;top:50%;width:10px;height:10px;border:2px solid var(--mobile-surface);border-radius:50%;background:var(--mobile-primary);transform:translate(-50%,-50%);box-sizing:content-box}
 .grid-share-range-bounds{display:flex;justify-content:space-between;gap:12px;font-size:.8rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.grid-share-range-bounds>span{min-width:0;flex:1}.grid-share-range-bounds>span:last-child{text-align:right}
 .grid-share-time{border-top:1px solid var(--mobile-outline-variant);padding-top:12px}
 .grid-share-summary .grid-share-disclosure{font-size:.7rem;margin-top:-8px}
 .grid-share-card .grid-share-open{display:block;color:var(--mobile-primary);font-weight:650;font-size:.875rem;padding-top:14px}

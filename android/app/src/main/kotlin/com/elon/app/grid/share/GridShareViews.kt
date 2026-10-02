@@ -111,9 +111,11 @@ internal class GridShareViews(private val context: Context) {
             container ?: return false
             container.removeAllViews(); container.visibility = View.VISIBLE; text.text = ""; text.visibility = View.GONE
             val ui = GridShareViews(container.context)
-            container.addView(ui.summary(card.getJSONObject("grid")).apply {
-                layoutParams = LinearLayout.LayoutParams(minOf(ui.dp(326), resources.displayMetrics.widthPixels - ui.dp(88)), -2)
-                addView(ui.text("查看网格详情 ›", 14f).apply { setTextColor(context.getColor(R.color.mobile_primary)); minHeight = ui.dp(48); gravity = Gravity.CENTER_VERTICAL; typeface = Typeface.DEFAULT_BOLD })
+            container.addView(GridShareMessageCard(container.context).apply {
+                layoutParams = LinearLayout.LayoutParams(-2, -2)
+                addView(ui.summary(card.getJSONObject("grid")).apply {
+                    addView(ui.text("查看网格详情 ›", 14f).apply { setTextColor(context.getColor(R.color.mobile_primary)); minHeight = ui.dp(48); gravity = Gravity.CENTER_VERTICAL; typeface = Typeface.DEFAULT_BOLD })
+                }, LinearLayout.LayoutParams(-1, -2))
                 minimumHeight = ui.dp(48); isFocusable = true
                 setOnClickListener { GridShareFeature.current?.openCard(card, message) }
             })

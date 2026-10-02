@@ -209,9 +209,9 @@ class ChatAdapter(
         bindUserAvatar(holder.userAvatar)
         bindSenderAvatar(holder.friendAvatar, message)
         bindGroupMentionAvatar(holder.friendAvatar ?: holder.itemView.findViewById(R.id.groupAiAvatar), message, onSenderAvatarLongPress)
-        bindChatSelectionVisual(holder, selectionMode, (!projectCardBound || com.elon.app.chatrecords.ChatRecordDocument.card(message.content) != null) && isSelectableMessage(message),
+        bindChatSelectionVisual(holder, selectionMode, (!projectCardBound || com.elon.app.chatrecords.ChatRecordDocument.card(message.content) != null || com.elon.app.grid.share.GridShareModel.card(message.content) != null) && isSelectableMessage(message),
             selectionMode && selectionIdentity.contains(message))
-        bindMessageActions(holder, message, projectCardBound && com.elon.app.chatrecords.ChatRecordDocument.card(message.content) == null)
+        bindMessageActions(holder, message, projectCardBound && com.elon.app.chatrecords.ChatRecordDocument.card(message.content) == null && com.elon.app.grid.share.GridShareModel.card(message.content) == null)
         WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction.takeUnless { selectionMode })
         bindFinalReplyLabel(holder, message); bindEvidence(holder, message, position)
         com.elon.app.socialquotes.SocialQuoteRows.bind(holder.itemView, message, messages, !selectionMode)
