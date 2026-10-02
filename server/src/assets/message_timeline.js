@@ -6,9 +6,9 @@
   function create(options = {}) {
     const maxMessages = Math.max(50, Math.min(300, options.maxMessages || 150));
     const maxBytes = options.maxBytes || 1500000;
-    let rows = [], before = null, sync = null, hasOlder = false, hasNewer = false, following = true, unread = 0;
-    function reset() { rows = []; before = sync = null; hasOlder = hasNewer = false; following = true; unread = 0; }
-    function snapshot() { return { messages: rows, before, sync, hasOlder, hasNewer, following, unread }; }
+    let rows = [], before = null, after = null, sync = null, hasOlder = false, hasNewer = false, following = true, unread = 0, version = options.version || 1;
+    function reset() { rows = []; before = after = sync = null; hasOlder = hasNewer = false; following = true; unread = 0; version = options.version || 1; }
+    function snapshot() { return { messages: rows, before, after, sync, hasOlder, hasNewer, following, unread, version }; }
     function bound(direction) {
       let bytes = rows.reduce((sum, m) => sum + new TextEncoder().encode(JSON.stringify(m)).length, 0);
       while (rows.length > 1 && (rows.length > maxMessages || bytes > maxBytes)) {
@@ -17,11 +17,14 @@
         if (direction === 'older') hasNewer = true; else hasOlder = true;
       }
       before = rows[0]?.timeline_cursor || before;
+      after = rows[rows.length - 1]?.timeline_after_cursor || after;
     }
     function apply(page, direction = 'sync') {
-      if (!page || page.schema !== SCHEMA || !Array.isArray(page.messages) || !Array.isArray(page.removed_ids)) throw new Error('无效的消息分页响应');
+      if (!page || ![SCHEMA, 'elon.message_timeline.v2'].includes(page.schema) || !Array.isArray(page.messages) || !Array.isArray(page.removed_ids)) throw new Error('无效的消息分页响应');
+      if (page.schema === 'elon.message_timeline.v2') version = 2;
       if (page.reset) return { ...snapshot(), reset: true };
       if (direction === 'latest') { rows = []; hasNewer = false; following = true; unread = 0; }
+      if (direction === 'around') { rows = []; hasOlder = hasNewer = false; following = false; unread = 0; }
       if (direction === 'window') { hasNewer = true; following = false; }
       const prior = new Map(rows.map(m => [m.id, m]));
       const oldest = rows[0];
@@ -35,19 +38,27 @@
         prior.set(message.id, old && !message.recalled_at && (old.recalled_at || revision(old) > revision(message)) ? old : message);
       }
       rows = Array.from(prior.values()).sort(compare);
-      if (direction !== 'sync' && direction !== 'window') { hasOlder = page.has_more; before = page.before; }
+      if (direction !== 'sync' && direction !== 'window') {
+        if (version === 2) {
+          if (direction !== 'newer') hasOlder = !!page.has_older;
+          if (direction !== 'older') hasNewer = !!page.has_newer;
+        } else hasOlder = page.has_more;
+        before = page.before || before;
+      }
       if (page.sync) sync = page.sync;
-      bound(direction === 'older' || !following ? 'older' : 'latest');
+      bound(direction === 'newer' ? 'latest' : direction === 'older' || !following ? 'older' : 'latest');
       return snapshot();
     }
     function query(scope, direction = 'sync') {
       const args = new URLSearchParams({ kind: scope.kind, id: scope.id, limit: '50' });
       if (scope.project) args.set('project', scope.project);
       if (direction === 'older' && before) args.set('before', before);
+      else if (direction === 'newer' && after) args.set('after', after);
       else if (direction === 'sync' && sync) args.set('sync', sync);
-      return '/api/me/message-timeline?' + args.toString();
+      return '/api/me/message-timeline' + (version === 2 ? '/v2' : '') + '?' + args.toString();
     }
     return { reset, snapshot, apply, query,
+      upgrade(value = 2) { version = value; },
       follow(value) { following = value; if (value && !hasNewer) unread = 0; },
     };
   }

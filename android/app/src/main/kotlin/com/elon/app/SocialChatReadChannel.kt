@@ -13,8 +13,9 @@ import org.json.JSONObject
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-internal class SocialChatReadError(val status: Int, message: String) : Exception(message)
-internal fun Throwable.socialAccessDenied() = this is SocialChatReadError && status in listOf(401, 403, 404)
+internal class SocialChatReadError(val status: Int, message: String,
+    val accessDenied: Boolean = status in listOf(401, 403, 404)) : Exception(message)
+internal fun Throwable.socialAccessDenied() = this is SocialChatReadError && accessDenied
 internal fun socialSession(context: Context) = "${AuthManager.userId(context)}|${AuthManager.prefs(context).getString("auth_session_revision", "")}|${AuthManager.token(context)}"
 
 /** One bounded read per channel, a trailing refresh for push bursts, and epoch/session fencing. */
@@ -31,6 +32,8 @@ internal class SocialChatReadChannel(private val context: Context, private val h
     var onIdle: () -> Unit = {}
     fun isReading(key: String) = call != null && requestKey == key
     fun timeline(key: String): MessageTimelineWindow? = timelines[key]
+    fun readingPositions(key: String, changed: () -> Unit) = ReadingPositions(context, http, server, key, changed)
+    fun locate(key: String, query: Map<String, String>) { cancel(); window(key).locate(query) }
     private fun window(key: String): MessageTimelineWindow {
         val session = socialSession(context)
         if (timelineSession != session) { timelines.clear(); timelineSession = session }
@@ -47,7 +50,7 @@ internal class SocialChatReadChannel(private val context: Context, private val h
 
     fun invalidate(key: String) {
         if (requestKey == null || requestKey == key) cancel()
-        timelines.remove(key)
+        // Journal sync revalidates this bounded window; invalidation must not discard a bookmark view.
         val user = AuthManager.userId(context) ?: return
         SocialChatSnapshotStore.forAccount(context, server, user).remove(key)
     }
@@ -60,6 +63,7 @@ internal class SocialChatReadChannel(private val context: Context, private val h
             followUp = {
                 if (requested == "older") timelines[key]?.older()
                 if (requested == "latest") timelines[key]?.latest()
+                if (requested == "newer") timelines[key]?.newer()
                 read(key, path, field, false, cached, value, error)
             }
             return
@@ -83,7 +87,9 @@ internal class SocialChatReadChannel(private val context: Context, private val h
             val result = runCatching {
                 next.execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) throw SocialChatReadError(response.code, runCatching { JSONObject(body).optString("error") }.getOrDefault("").ifBlank { "同步失败（${response.code}）" })
+                    if (!response.isSuccessful) throw SocialChatReadError(response.code,
+                        runCatching { JSONObject(body).optString("error") }.getOrDefault("").ifBlank { "同步失败（${response.code}）" },
+                        response.code in listOf(401, 403) || (response.code == 404 && direction != "around"))
                     JSONObject(body)
                 }
             }
@@ -99,8 +105,9 @@ internal class SocialChatReadChannel(private val context: Context, private val h
                 }.onSuccess { rows ->
                     if (changed) io.execute { synchronized(cacheFence) { store.write(key, rows, ::valid) } }
                 }.onFailure { failure ->
+                    if (direction == "around") timeline?.cancelLocate()
                     if (failure.socialAccessDenied()) { store.remove(key); timelines.remove(key) }
-                    if (failure is SocialChatReadError && failure.status == 400) timeline?.latest()
+                    if (failure is SocialChatReadError && failure.status == 400 && timeline?.following == true) timeline.latest()
                     error(failure)
                 }
                 if (valid() && accepted.isSuccess && canMarkRead()) timeline?.readReceipt(key)?.let { receipt ->

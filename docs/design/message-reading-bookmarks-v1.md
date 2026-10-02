@@ -1,17 +1,18 @@
 ---
 version_status: current
-decision_status: proposed
-implementation_status: pending
+decision_status: accepted
+implementation_status: partial
 reviewed_at: 2026-10-02
 owner: conversation-platform
 ---
 
 # 书签与阅读位置技术设计
 
-本文件定义[多书签需求](../requirements/message-reading-bookmarks-v1.md)的拟议接入合同。
-接口名称、字段和默认参数是待实现设计，不能作为当前可调用 API。
+本文件定义[多书签需求](../requirements/message-reading-bookmarks-v1.md)的接入合同。
+首批群聊/好友实现见[交付记录](../reports/social-reading-bookmarks-20261002.md)，其中列出实际接口；
+下文保留完整来源的目标设计，未列入首批的接口不得视为已上线。
 
-## 当前能力与缺口
+## 实施前基线与目标缺口
 
 以本轮基线 `c3e5311116c150c06e5a4410313e9027b9665b8b` 为核对依据：
 

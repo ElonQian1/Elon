@@ -1,4 +1,5 @@
 import { useTimelineAnchor } from '../message-timeline/useTimelineAnchor'
+import { useReadingBookmarks } from '../reading-positions/useReadingBookmarks'
 import { useHistoryPagination } from '../message-timeline/useHistoryPagination'
 import type { useMessageTimeline } from '../message-timeline/useMessageTimeline'
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
@@ -32,7 +33,6 @@ import GroupAiStatus from './group-ai/GroupAiStatus'
 import GroupAiReplyContext from './group-ai/GroupAiReplyContext'
 import GridShareMessage from '../grid-share/GridShareMessage'
 import { gridCard } from '../grid-share/gridShareModel'
-import { readSocialPosition, saveSocialPosition } from './socialReadPosition'
 import styles from './FriendsPage.module.css'
 import tools from './SocialTools.module.css'
 
@@ -62,6 +62,10 @@ export default function SocialConversation(props: Props) {
   const feed = useRef<HTMLDivElement>(null)
   const captureAnchor = useTimelineAnchor(feed, messages)
   const follow = useRef(true)
+  const readingBar = useRef<HTMLDivElement>(null)
+  const reading = useReadingBookmarks(me.id, conversation, feed, readingBar, messages, props.timeline, historical => {
+    follow.current = !historical; props.timeline.follow(!historical)
+  }, !!query.trim())
   const [newMessages, setNewMessages] = useState(false)
   function older() { captureAnchor(); follow.current = false; props.timeline.follow(false); void props.timeline.older() }
   useHistoryPagination(feed, key, { hasOlder: props.timeline.hasOlder, loading: props.timeline.loading, load: older })
@@ -69,9 +73,8 @@ export default function SocialConversation(props: Props) {
     setAiSelection(null)
     setQuoteDetail(null)
     setQuery(''); setSelectedIds([]); setSelectionMode(false); setMenu(null); setNotice(''); follow.current = true; setNewMessages(false)
-    const node = feed.current, saved = readSocialPosition(me.id, key)
-    if (node) { node.scrollTop = saved ?? node.scrollHeight; follow.current = saved == null || node.scrollHeight - node.clientHeight - saved < 80 }
-    return () => { if (node) saveSocialPosition(me.id, key, node.scrollTop) }
+    const node = feed.current
+    if (node) node.scrollTop = node.scrollHeight
   }, [key])
   useEffect(() => {
     if (follow.current && feed.current) feed.current.scrollTop = feed.current.scrollHeight
@@ -88,7 +91,7 @@ export default function SocialConversation(props: Props) {
     else if (selectedIds.length < 20) setSelectedIds(old => [...old, message.id])
     else setNotice('一次最多选择 20 条消息，请分批操作')
   }
-  function latest() { void props.timeline.latest(); props.timeline.follow(true); follow.current = true; setNewMessages(false); if (feed.current) feed.current.scrollTop = feed.current.scrollHeight }
+  function latest() { void (reading.current?.latest() || props.timeline.latest()); setNewMessages(false) }
   return <div className={tools.conversation}>
     <SocialConversationTools conversation={conversation} query={query} onQuery={setQuery} messages={messages}
       selected={selected} selectionMode={selectionMode} onClearSelection={() => { setSelectedIds([]); setSelectionMode(false); setNotice('') }}
@@ -97,7 +100,8 @@ export default function SocialConversation(props: Props) {
       hiddenCount={local.hidden.filter(id => id.startsWith(`${key}:`)).length} onRestore={() => local.restore(`${key}:`)} />
     {(notice || local.error) && <p className={tools.status} role="status">{local.error || notice}</p>}
     <GroupAiStatus owner={me.id} group={conversation.kind === 'group' ? conversation.id : ''} onDelivered={props.onSent} />
-    <div className={`${styles.feed} ${tools.feed}`} ref={feed} onScroll={() => { const node = feed.current!; follow.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; props.timeline.follow(follow.current); if (follow.current) setNewMessages(false) }}>
+    <div ref={readingBar} />
+    <div className={`${styles.feed} ${tools.feed}`} ref={feed} onScroll={() => { const node = feed.current!; follow.current = !reading.current?.historical() && node.scrollHeight - node.clientHeight - node.scrollTop < 80; props.timeline.follow(follow.current); if (follow.current) setNewMessages(false) }}>
       {props.timeline.hasOlder && <button type="button" disabled={props.timeline.loading} onClick={older}>{props.timeline.loading ? '正在加载…' : '加载更早消息'}</button>}
       {props.timeline.hasNewer && <button type="button" onClick={latest}>回到最新消息</button>}
       {props.error && <p className={styles.syncStatus} role="status">{props.error} <button type="button" className={styles.syncRetry} onClick={props.retry}>重试</button></p>}
@@ -145,6 +149,7 @@ export default function SocialConversation(props: Props) {
             <SocialMessageMenu conversation={conversation} message={m} own={own} compactLink={compactLink} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}
               onForward={() => setForward([saveItem(m)])} onSelect={() => select(m)}
+              onBookmark={() => reading.current?.add(m)}
               onAiReply={conversation.kind === 'group' ? () => setAiSelection([m]) : undefined}
               onFavorite={() => favorites.has(savedKey) ? local.remove(savedKey) : local.save([saveItem(m)])}
               onHide={() => { local.hide([savedKey]); setSelectedIds(old => old.filter(id => id !== m.id)) }}
@@ -154,6 +159,7 @@ export default function SocialConversation(props: Props) {
           </div>
         </div>
       })}
+      {props.timeline.hasNewer && reading.current?.historical() && <button type="button" disabled={props.timeline.loading} onClick={() => { captureAnchor(); void props.timeline.newer() }}>继续向后阅读</button>}
     </div>
     {newMessages && <button type="button" className={tools.latest} onClick={latest}>有新消息 · 回到最新</button>}
     <SocialComposer conversation={conversation} title={title} me={me} input={input} setInput={setInput} setMessages={setMessages} onSent={() => { latest(); props.onSent() }} quote={quote} />

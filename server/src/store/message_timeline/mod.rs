@@ -3,10 +3,12 @@ mod cursor;
 #[cfg(test)]
 mod integration_tests;
 mod query;
+pub(crate) mod reading;
 mod recovery;
 pub(crate) mod schema;
 #[cfg(test)]
 mod tests;
+pub(crate) mod v2;
 
 use super::Store;
 use anyhow::{bail, Result};

@@ -1,7 +1,7 @@
 use super::*;
 use rusqlite::{params, Connection};
 
-fn store(count: usize) -> Store {
+pub(super) fn store(count: usize) -> Store {
     let mut conn = Connection::open_in_memory().unwrap();
     conn.execute_batch("CREATE TABLE users(id TEXT PRIMARY KEY,nickname TEXT,email TEXT,phone TEXT);
         CREATE TABLE user_friends(user_id TEXT,friend_user_id TEXT);

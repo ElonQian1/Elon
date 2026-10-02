@@ -31,9 +31,9 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE, application = Application::class)
 class MessageHistoryNavigationTest {
-    private fun pump(until: () -> Boolean) {
+    private fun pump(details: () -> String = { "" }, until: () -> Boolean) {
         repeat(250) { shadowOf(Looper.getMainLooper()).idle(); if (until()) return; Thread.sleep(10) }
-        assertTrue("history request did not settle", until())
+        assertTrue("history request did not settle ${details()}", until())
     }
     private fun page(start: Int, end: Int, more: Boolean) = JSONObject().put("schema", "elon.message_timeline.v1")
         .put("messages", JSONArray((start until end).map { n -> JSONObject().put("id", n.toString().padStart(4, '0'))
@@ -94,7 +94,7 @@ class MessageHistoryNavigationTest {
             reader.timeline("group:g")!!.latest(); read(); pump { rows.size == 50 && !reader.isReading("group:g") }
             failOlder = true; manager.scrollToPositionWithOffset(0, 0); layout(); gesture(); pump { failure != null }
             assertEquals(50, rows.size)
-            failOlder = false; gesture(); pump { rows.first().id == "0100" }; assertTrue(rows.size <= 150)
+            failOlder = false; gesture(); pump({ "olderCalls=${olderCalls.get()} reading=${reader.isReading("group:g")} first=${rows.first().id} position=${manager.findFirstVisibleItemPosition()} mode=${reader.timeline("group:g")?.nextDirection}" }) { rows.first().id == "0100" }; assertTrue(rows.size <= 150)
             manager.scrollToPosition(rows.lastIndex); layout(); gesture(towardLatest = true)
             pump { rows.size == 50 && rows.first().id == "0150" }
             assertEquals("0199", rows.last().id)

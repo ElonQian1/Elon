@@ -19673,19 +19673,19 @@
     {
       "id": "message-reading-bookmarks-v1",
       "title": "多书签与独立历史阅读进度",
-      "summary": "方案完善，仍未实现：固定书签与独立续读、普通进群最新与显式恢复、around/after 双向窗口、离线和跨端冲突、权限删除边界；APK/PWA/Win 群聊好友先交付，自有 AI/项目随后接入。",
-      "status": "proposed",
+      "summary": "方案已接受；群聊好友三端实现与发布由 social-reading-bookmarks-v1 跟踪。自有 AI/项目页面 UI 后续接入，父功能保持未全部交付。",
+      "status": "accepted",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/message-reading-bookmarks-v1.md",
-        "content_hash": "9b96287ba74351bdc5504a761e7d5049bb8a2aa6a420ecb14f56333f0cbc0ceb",
+        "content_hash": "fb4187758791ca2659dfb7e899384019929b22f0a6366312b147bae3588c5115",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "c3e5311116c150c06e5a4410313e9027b9665b8b",
-          "head_blob_oid": "236ee5725cfd0ce36da4a13b6be74f24eff634a2",
-          "worktree_blob_oid": "0323b59621dbf53bcb7676ed5e10a3ba20bc4623",
+          "head_commit": "063203d62e6512fdfb221b96f307f13e64fff1f4",
+          "head_blob_oid": "0323b59621dbf53bcb7676ed5e10a3ba20bc4623",
+          "worktree_blob_oid": "a94e2c73f5866d9bf588d7938e06f4c58f715cf1",
           "state": "tracked_modified"
         }
       },
@@ -19717,7 +19717,7 @@
       ],
       "implementation_evidence": [],
       "created_at_ms": 1790853502027,
-      "updated_at_ms": 1790914422417
+      "updated_at_ms": 1790925695888
     },
     {
       "id": "message-timeline-v1",
@@ -24601,6 +24601,130 @@
       ],
       "created_at_ms": 1790661658181,
       "updated_at_ms": 1790668106266
+    },
+    {
+      "id": "social-reading-bookmarks-v1",
+      "title": "群聊好友三端多书签与独立续读",
+      "summary": "实现并发布群聊好友的私人多书签、稳定消息定位、双向历史、各自续读进度、离线恢复和跨端冲突。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/social-reading-bookmarks-v1.md",
+        "content_hash": "2ed5629f2382532e651fb37e272386b5425ecb39da47bb4434f4cb719e60f96d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "063203d62e6512fdfb221b96f307f13e64fff1f4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6d547eb8234060f00feae9a877140b3505241119",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "conversation-platform",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MessageTimelineNavigation.kt",
+        "android/app/src/main/kotlin/com/elon/app/reading",
+        "pc-frontend/src/features/friends",
+        "pc-frontend/src/features/message-timeline",
+        "server/src/assets/message_timeline.js",
+        "server/src/assets/social_chat_recovery.js",
+        "server/src/router/social_routes/message_timeline.rs",
+        "server/src/store/message_timeline"
+      ],
+      "dependencies": [
+        "android-social-timeline-reentry-v1"
+      ],
+      "acceptance_criteria": [
+        "三端多书签固定起点与各自进度独立，回最新及重入不覆盖",
+        "十万条历史按消息直接定位及双向连续分页，窗口有界",
+        "离线重启、幂等、跨端冲突、删除和权限失败关闭",
+        "发布服务端与三端入口并记录小米及浏览器运行证据"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/ReadingPositionsTest.kt",
+          "content_hash": "6017111624f60bfbb55e549fdbc5c9468da09f8ae51a3e649493ed603a4740f2",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e00e38551c1c7fcbe85a7163d01fe9b3060fefae",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-reading-bookmarks-browser.cjs",
+          "content_hash": "33e520acd7063b81df70f9ae1453f0cb2aedfbcb26bf95ef1e80ff03fbc64999",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a4991489fcac6d375a39676443ce24eae3d3b4fe",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-reading-bookmarks-browser.cjs",
+          "content_hash": "d7ded8ef24fee167fbc1652b19b4de6f2753f9b57ed5828999d5d0ce82fedb9f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "10c21d59a69fae332588a85c4d58d301e9c6ace2",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/reading/mod.rs",
+          "content_hash": "0a2caf93f7c6d83ec837c80bc134310dfb716102eaa2234852aedb5c40be85bf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c00cdc55831f633ae611ec399a91d45544ec9806",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/reading/tests.rs",
+          "content_hash": "946a4f9fb8c9cda79e7c79fec85d56d2f3d99479df45d827a18fac55de9febcc",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ea93af583db211da90bce7b45d6965f098edcca4",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/v2.rs",
+          "content_hash": "7a54c11e6bafb12a5b358dac6ba28a94f62fe2eaccbf7c48ce36ecf7330e537c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "50be008369eb30a0334f860a568143b56fc4e0d6",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "977bbaa7718ec7fbd99a5123d8560d2317c2c96f",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1790915508984,
+      "updated_at_ms": 1790926107355
     },
     {
       "id": "social-sync-status-lifecycle-v1",
@@ -33167,146 +33291,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cffbc8d14d6d453f96978693c0897e77",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "requirement_rebound",
-      "actor": "codex",
-      "reason": "User added updated APK screenshot and requested shared polish",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1789549602747
-    },
-    {
-      "id": "feature_event_ca1f9b8643ca4ddbbcbc2f1dc3068e5a",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "metadata_updated",
-      "actor": "codex",
-      "reason": "User added updated APK screenshot and requested shared polish",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1789549602812
-    },
-    {
-      "id": "feature_event_3c7dc42cca064126862cf91d716887f9",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Reviewed bounded shared UI and provider rules against updated screenshots",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1789549602864
-    },
-    {
-      "id": "feature_event_f1c7b3fc2557454f8cbdb352503b6806",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Reviewed bounded shared UI and provider rules against updated screenshots",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1789549602914
-    },
-    {
-      "id": "feature_event_cd5117b1ea1f4ab89d5dcc676814ae66",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789549602966
-    },
-    {
-      "id": "feature_event_27cd52efc90f4d1badc41fe4b5735d56",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789549661039
-    },
-    {
-      "id": "feature_event_f9525f6981be4a2c9597c8ab35c5527c",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "claim_released",
-      "actor": "codex",
-      "reason": "Correct Android Kotlin ownership paths and final three-line title presentation",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1789550383774
-    },
-    {
-      "id": "feature_event_c7cf230a928343908b17a7ba0d06bd4a",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "requirement_rebound",
-      "actor": "codex",
-      "reason": "Final reviewed shared layout allows three title lines",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1789550384045
-    },
-    {
-      "id": "feature_event_4d86e838fbe0435386a1b211a60101a2",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "metadata_updated",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1789550384094
-    },
-    {
-      "id": "feature_event_9c1236e1fad54a37875708f8838abdb0",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Scoped implementation and tests reviewed",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1789550384144
-    },
-    {
-      "id": "feature_event_6571287b6dca4af5b0c08be14c1bbb13",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Scoped implementation and tests reviewed",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1789550384196
-    },
-    {
-      "id": "feature_event_ad3d0061cea04ca0948b9f2827815aec",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789550384247
-    },
-    {
-      "id": "feature_event_98b542f1ace64340b33def7d53225514",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789550384300
-    },
-    {
-      "id": "feature_event_53da595c0edc4fc497f0757a172db0af",
-      "feature_id": "win-social-card-polish-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789550566573
-    },
-    {
       "id": "feature_event_4d25e69ad142410a8c5ff4b2abe69883",
       "feature_id": "win-social-card-polish-v1",
       "action": "transitioned",
@@ -35165,6 +35149,146 @@
       "from_status": "proposed",
       "to_status": "proposed",
       "at_ms": 1790914422417
+    },
+    {
+      "id": "feature_event_c04b9cfedc5246faad327bd19f0a90ba",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "registered",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790915508984
+    },
+    {
+      "id": "feature_event_eeded2a89ca14ca0987609f15e543858",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "claimed",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790915509008
+    },
+    {
+      "id": "feature_event_0bd27c62b14341f48caa9262b4d7e8b0",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "transitioned",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790917078678
+    },
+    {
+      "id": "feature_event_4927231aacfa49d3889d543df2355b6d",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "claim_released",
+      "actor": "codex-bookmarks",
+      "reason": "绑定稳定首批合同，交付状态独立记录",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1790925663906
+    },
+    {
+      "id": "feature_event_993f829cb1884191913c9cd19c9e4140",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-bookmarks",
+      "reason": "交付状态移至报告，需求语义保持",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1790925664228
+    },
+    {
+      "id": "feature_event_54c1dff76f3b493395f968cdaa21ca96",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "transitioned",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1790925664263
+    },
+    {
+      "id": "feature_event_2c8d2835249149d5b454e0955791e88e",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "transitioned",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1790925664296
+    },
+    {
+      "id": "feature_event_9699cdab331642229e083ed28edd02fa",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "claimed",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790925664329
+    },
+    {
+      "id": "feature_event_53fb96bda7884e64a4fd548bb4f18983",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "transitioned",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790925695537
+    },
+    {
+      "id": "feature_event_928cb96854f84968a2dcfcca009502c6",
+      "feature_id": "message-reading-bookmarks-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-bookmarks",
+      "reason": "用户已授权实现上线，首批群聊好友与后续来源分开跟踪",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1790925695808
+    },
+    {
+      "id": "feature_event_920490c105424b13acac3220b752e8ef",
+      "feature_id": "message-reading-bookmarks-v1",
+      "action": "metadata_updated",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "proposed",
+      "to_status": "proposed",
+      "at_ms": 1790925695852
+    },
+    {
+      "id": "feature_event_b58bf24998434e59b882ca08bfddb835",
+      "feature_id": "message-reading-bookmarks-v1",
+      "action": "transitioned",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1790925695888
+    },
+    {
+      "id": "feature_event_e728d39d55b44094880ca6e9ba0763cf",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790926107313
+    },
+    {
+      "id": "feature_event_39f030243a4e4157aa728af823f3cf6a",
+      "feature_id": "social-reading-bookmarks-v1",
+      "action": "transitioned",
+      "actor": "codex-bookmarks",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790926107355
     }
   ]
 }

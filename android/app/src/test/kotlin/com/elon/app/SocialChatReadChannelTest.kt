@@ -21,6 +21,27 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE, application = Application::class)
 class SocialChatReadChannelTest {
+    @Test fun missingBookmarkKeepsCurrentWindowAndRestoresItsProtocol() {
+        val context = RuntimeEnvironment.getApplication(); signIn("missing-bookmark")
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val missing = chain.request().url.queryParameter("bookmark") != null
+            val body = if (missing) "{\"error\":\"书签不可用\"}" else "{\"schema\":\"elon.message_timeline.v1\",\"messages\":[{\"id\":\"m1\",\"created_at\":\"2026-10-02\",\"timeline_cursor\":\"v1-cursor\"}],\"removed_ids\":[],\"has_more\":true,\"sync\":\"checkpoint\"}"
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(if (missing) 404 else 200)
+                .message("fixture").body(body.toResponseBody()).build()
+        }.build()
+        val channel = SocialChatReadChannel(context, client, "https://test.invalid")
+        var rows = JSONArray(); var failure: Throwable? = null
+        fun read() = channel.read("group:g", "/unused", "messages", value = { rows = it }, error = { failure = it })
+        try {
+            read(); pump { rows.length() == 1 }
+            channel.locate("group:g", mapOf("bookmark" to "missing-bookmark")); read(); pump { failure != null }
+            assertFalse(failure!!.socialAccessDenied()); assertEquals("m1", rows.getJSONObject(0).getString("id"))
+            val state = channel.timeline("group:g")!!
+            assertTrue(state.following); assertEquals("sync", state.direction())
+            assertFalse(state.path("group:g", "older").contains("/v2"))
+            assertTrue(state.path("group:g", "older").contains("before=v1-cursor"))
+        } finally { channel.cancel(); SocialChatSnapshotStore.clear(context) }
+    }
     private fun signIn(id: String) {
         AuthManager.prefs(RuntimeEnvironment.getApplication()).edit().putString("auth_user_id", id)
             .putString("auth_token", "synthetic-$id").putString("auth_session_revision", id).putLong("auth_expires_at", 0).commit()

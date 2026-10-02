@@ -6,6 +6,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MessageTimelineWindowTest {
+    @Test fun bookmarkPagesMoveBothWaysWithoutFollowingOrReadingSkippedHistory() {
+        fun v2(start: Int) = page(start, 50, true).put("schema", "elon.message_timeline.v2").put("has_older", true).put("has_newer", true).also { p ->
+            repeat(50) { i -> p.getJSONArray("messages").getJSONObject(i).put("timeline_after_cursor", "a${start + i}") }
+        }
+        val window = MessageTimelineWindow(maxMessages = 50)
+        window.locate(mapOf("bookmark" to "bookmark-test", "resume" to "true"))
+        assertTrue(window.path("group:g", "around").contains("/v2?"))
+        window.accept(v2(100), "around")
+        val forward = window.accept(v2(150).put("has_newer", false), "newer")
+        assertEquals("000150", forward.getJSONObject(0).getString("id"))
+        assertTrue(window.path("group:g", "older").contains("before=c150"))
+        assertTrue(window.path("group:g", "newer").contains("after=a199"))
+        window.following = true
+        assertFalse(window.following)
+        assertNull(window.readReceipt("group:g"))
+        window.latest(); assertFalse(window.following)
+        window.accept(v2(950).put("has_newer", false), "latest"); assertTrue(window.following)
+    }
     private fun row(n: Int) = JSONObject().put("id", n.toString().padStart(6, '0')).put("created_at", "2026-10-01")
         .put("content", "消息").put("timeline_cursor", "c$n")
     private fun page(start: Int, count: Int, more: Boolean = false) = JSONObject().put("schema", "elon.message_timeline.v1")

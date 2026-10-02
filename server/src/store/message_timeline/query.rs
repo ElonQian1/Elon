@@ -78,6 +78,19 @@ pub(super) fn messages(
     ids: Option<&[String]>,
     limit: usize,
 ) -> Result<Vec<Value>> {
+    directed_messages(conn, owner, r, before, ids, limit, false)
+}
+
+pub(super) fn directed_messages(
+    conn: &Connection,
+    owner: &str,
+    r: &TimelineRequest,
+    boundary: Option<&(String, String)>,
+    ids: Option<&[String]>,
+    limit: usize,
+    ascending: bool,
+) -> Result<Vec<Value>> {
+    let before = boundary;
     let (select, source, filter) = match r.kind.as_str() {
         "group" => ("m.id,m.group_id,m.sender_user_id,COALESCE(u.nickname,u.email,u.phone,m.sender_user_id),m.content,m.attachments_json,m.created_at,m.recalled_at,m.recalled_by,m.revision,m.edited_at",
             "friend_group_messages m JOIN users u ON u.id=m.sender_user_id", "m.group_id=:id"),
@@ -92,6 +105,8 @@ pub(super) fn messages(
     };
     let extra = if ids.is_some() {
         "AND m.id IN (SELECT value FROM json_each(:ids))"
+    } else if before.is_some() && ascending {
+        "AND (m.created_at,m.id)>(:time,:message)"
     } else if before.is_some() {
         "AND (m.created_at,m.id)<(:time,:message)"
     } else {
@@ -99,13 +114,14 @@ pub(super) fn messages(
     };
     // Each direction of a private chat has its own indexed, limited seek. Applying
     // LIMIT after an OR over both senders can scan/sort the entire conversation.
+    let order = if ascending { "ASC" } else { "DESC" };
     let bounded_friend;
     let source = if r.kind == "friend" && ids.is_none() {
         let legs = [
             "m.sender_user_id=:owner AND m.receiver_user_id=:id AND (:id!=:ai OR m.context_user_id IS NULL)",
             "m.sender_user_id=:id AND m.receiver_user_id=:owner AND (:id!=:ai OR m.context_user_id IS NULL)",
             "m.sender_user_id=:ai AND m.receiver_user_id=:owner AND m.context_user_id=:id AND :id!=:ai",
-        ].map(|predicate| format!("SELECT * FROM (SELECT * FROM friend_messages m WHERE {predicate} {extra} ORDER BY m.created_at DESC,m.id DESC LIMIT :limit)"));
+        ].map(|predicate| format!("SELECT * FROM (SELECT * FROM friend_messages m WHERE {predicate} {extra} ORDER BY m.created_at {order},m.id {order} LIMIT :limit)"));
         bounded_friend = format!(
             "({}) m LEFT JOIN users u ON u.id=m.sender_user_id",
             legs.join(" UNION ALL ")
@@ -114,7 +130,7 @@ pub(super) fn messages(
     } else {
         source
     };
-    let sql = format!("SELECT {select} FROM {source} WHERE ({filter}) {extra} ORDER BY m.created_at DESC,m.id DESC LIMIT :limit");
+    let sql = format!("SELECT {select} FROM {source} WHERE ({filter}) {extra} ORDER BY m.created_at {order},m.id {order} LIMIT :limit");
     let mut stmt = conn.prepare(&sql)?;
     let ids = serde_json::to_string(&ids.unwrap_or_default())?;
     for (key, value) in [
@@ -178,6 +194,8 @@ pub(super) fn messages(
             .map(serde_json::to_value)
             .collect::<serde_json::Result<_>>()?;
     }
-    result.reverse();
+    if !ascending {
+        result.reverse();
+    }
     Ok(result)
 }

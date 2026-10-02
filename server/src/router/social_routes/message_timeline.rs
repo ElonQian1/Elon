@@ -12,9 +12,12 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
+#[path = "reading_positions.rs"]
+mod reading_positions;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(reading_positions::routes())
         .route("/api/me/message-timeline", get(read))
         .route("/api/me/message-timeline/read", post(mark_read))
         .route("/api/me/message-timeline/window", post(recover_window))

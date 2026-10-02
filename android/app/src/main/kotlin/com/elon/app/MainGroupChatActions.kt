@@ -100,7 +100,7 @@ internal class MainGroupChatActions(
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
-            onMessageLongPress = showMessageActions,
+            onMessageLongPress = { view, message -> timelineNavigation.messageActions(view, message, showMessageActions) },
             onProjectShareAction = onProjectShareAction,
             onProjectShareLongPress = onProjectShareLongPress
         )
@@ -408,6 +408,7 @@ internal class MainGroupChatActions(
         allowPendingRefresh: Boolean = false
     ) {
         if (!foreground || !ensureOwner() || activeGroup?.id != group.id) return
+        if (scrollToBottom) timelineNavigation.prepareLatest()
         messagesByGroup.keys.filter { it != group.id }.dropLast(9).forEach { id ->
             val pending = messagesByGroup[id].orEmpty().filter { it.id.isNullOrBlank() && !it.sendStatus.isNullOrBlank() }
             if (pending.isEmpty()) messagesByGroup.remove(id) else messagesByGroup[id] = pending.toMutableList()

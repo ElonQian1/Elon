@@ -12,12 +12,15 @@
     const cache = options.cache;
     const timeline = root.ElonMessageTimeline.create({ maxMessages: 150 });
     let lastRead = '';
-    const nav = document.createElement('div'), older = document.createElement('button'), latest = document.createElement('button');
+    let reading = null;
+    const nav = document.createElement('div'), older = document.createElement('button'), latest = document.createElement('button'), newer = document.createElement('button');
+    newer.textContent = '继续向后阅读'; newer.type = 'button'; newer.style.minHeight = '48px'; nav.append(newer);
+    newer.onclick = () => void refresh(false, 'newer');
     nav.hidden = true; nav.setAttribute('aria-label', '聊天历史'); older.textContent = '加载更早消息'; latest.textContent = '回到最新消息';
     [older, latest].forEach(button => { button.type = 'button'; button.style.minHeight = '48px'; nav.append(button); });
     options.list?.before(nav);
     let edgePending = false, historyLoading = false, lastTop = 0, intentUntil = 0, touchY = 0, edgeFrame = 0;
-    function navigation() { const state = timeline.snapshot(); nav.hidden = !active; older.hidden = !state.hasOlder; latest.hidden = !state.hasNewer; older.disabled = historyLoading || edgePending; older.textContent = older.disabled ? '正在加载…' : '加载更早消息'; }
+    function navigation() { const state = timeline.snapshot(); nav.hidden = !active; older.hidden = !state.hasOlder; newer.hidden = state.version !== 2 || !state.hasNewer; latest.hidden = !state.hasNewer && !reading?.historical(); older.disabled = newer.disabled = historyLoading || edgePending; older.textContent = older.disabled ? '正在加载…' : '加载更早消息'; }
     function requestOlder() {
       if (historyLoading) return;
       if (!active || !visible() || !timeline.snapshot().hasOlder) { edgePending = false; return; }
@@ -35,7 +38,7 @@
     }
     function followPosition() {
       const list = options.list; if (!list) return;
-      timeline.follow(list.scrollHeight - list.clientHeight - list.scrollTop < 80);
+      timeline.follow(!reading?.historical() && list.scrollHeight - list.clientHeight - list.scrollTop < 80);
       if (list.scrollTop < lastTop && Date.now() < intentUntil) atEdge();
       lastTop = list.scrollTop; if (lastTop > 96) edgePending = false;
     }
@@ -47,7 +50,7 @@
     edgeListeners.forEach(([name, listener]) => options.list?.addEventListener(name, listener, { passive: true }));
     options.list?.addEventListener('scroll', followPosition, { passive: true });
     older.onclick = requestOlder;
-    latest.onclick = () => { edgePending = false; timeline.follow(true); void refresh(true, 'latest'); };
+    latest.onclick = () => { edgePending = false; if (reading) void reading.latest(); else void refresh(true, 'latest'); };
     const jobs = new Map(), snapshots = new Map(), outbox = new Map();
     let owner = '', epoch = 0, active = null, rendered = '', timer = null, wakeTimer = null, ticks = 0;
     const visible = options.visible || (() => document.visibilityState !== 'hidden');
@@ -58,6 +61,7 @@
     function ensureOwner() {
       if (owner === session()) return;
       const changingAccount = !!owner;
+      reading?.close(); reading = null;
       cancel(); snapshots.clear(); outbox.clear(); timeline.reset(); lastRead = ''; nav.hidden = true; active = null; rendered = ''; owner = session();
       if (changingAccount) options.accountChanged?.();
     }
@@ -68,7 +72,7 @@
           (async () => {
             const res = await options.api(path, { ...init, signal: controller.signal, cache: 'no-store' });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw Object.assign(new Error(data.error || '同步失败'), { status: res.status, authFailed: [401, 403].includes(res.status) });
+            if (!res.ok) throw Object.assign(new Error(data.error || '同步失败'), { status: res.status, code: data.code, authFailed: [401, 403].includes(res.status) });
             return data;
           })(),
           new Promise((_, reject) => { deadline = setTimeout(() => { controller.abort(); reject(new Error('同步超时，请重试')); }, timeout); }),
@@ -113,21 +117,22 @@
       if (signature !== rendered) { options.render(shown, kind, contact, scroll); rendered = signature; }
       options.status(shown.length ? '' : '还没有消息');
     }
-    function refresh(scroll = false, direction = 'sync') {
+    function refresh(scroll = false, direction = 'sync', target = null) {
       ensureOwner();
       if (!active || !visible()) return Promise.resolve();
       const { key, kind, contact } = active;
       const existing = jobs.get(key);
-      if (existing) { if (direction !== 'sync' || !existing.again) existing.again = () => refresh(scroll, direction); return existing.promise; }
+      if (existing) { if (direction !== 'sync' || !existing.again) existing.again = () => refresh(scroll, direction, target); return existing.promise; }
       const ticket = epoch, identity = owner;
       const job = { controller: new AbortController(), again: null };
       const valid = () => ticket === epoch && identity === session() && jobs.get(key) === job && active?.key === key;
       jobs.set(key, job); older.disabled = true;
       const mode = direction === 'sync' && !timeline.snapshot().sync ? 'latest' : direction;
       const list = options.list, top = list?.getBoundingClientRect().top || 0;
-      const anchor = (mode === 'older' || mode === 'window') && Array.from(list?.children || []).find(node => node.dataset.messageId && node.getBoundingClientRect().bottom > top);
+      const anchor = (mode === 'older' || mode === 'newer' || mode === 'window') && Array.from(list?.children || []).find(node => node.dataset.messageId && node.getBoundingClientRect().bottom > top);
       const saved = anchor && { id: anchor.dataset.messageId, offset: anchor.getBoundingClientRect().top - top };
-      const path = mode === 'window' ? '/api/me/message-timeline/window' : timeline.query({ kind, id: contact.id }, mode);
+      let path = mode === 'window' ? '/api/me/message-timeline' + (timeline.snapshot().version === 2 ? '/v2' : '') + '/window' : timeline.query({ kind, id: contact.id }, mode);
+      if (target) path += '&' + new URLSearchParams(target);
       const init = mode === 'window' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, id: contact.id, message_ids: timeline.snapshot().messages.map(m => m.id) }) } : {};
       job.promise = json(path, init, job.controller).then(async page => {
         if (!valid()) return;
@@ -149,10 +154,12 @@
           if (valid()) lastRead = id;
         }
         if (mode === 'sync' && page.has_more && valid() && !job.again) job.again = () => refresh();
+        return page;
       }).catch(error => {
         if (!valid()) return;
-        if ([401, 403, 404].includes(error.status)) { timeline.reset(); cache.remove(scopeKey(key)); snapshots.delete(key); outbox.delete(key); rendered = ''; paint(false); }
-        options.status([401, 403, 404].includes(error.status) ? '无法访问此会话，请检查账号或成员权限' : '同步暂时失败，已保留现有消息 · 点击重试', () => refresh(false, mode));
+        const denied = [401, 403].includes(error.status) || (error.status === 404 && mode !== 'around');
+        if (denied) { timeline.reset(); cache.remove(scopeKey(key)); snapshots.delete(key); outbox.delete(key); rendered = ''; paint(false); }
+        options.status(denied ? '无法访问此会话，请检查账号或成员权限' : mode === 'around' && error.status === 404 ? '书签或消息已不可用，已保留当前消息' : '同步暂时失败，已保留现有消息 · 点击重试', () => refresh(false, mode, target));
       }).finally(() => {
         if (!valid()) return;
         jobs.delete(key); if (mode === 'older') historyLoading = false; navigation();
@@ -173,10 +180,19 @@
       });
     }
     function directories() { return Promise.all([directory('friends'), directory('groups')]); }
-    function close() { cancel(); active = null; rendered = ''; timeline.reset(); lastRead = ''; nav.hidden = true; options.status(''); edgePending = false; historyLoading = false; intentUntil = 0; if (edgeFrame) root.cancelAnimationFrame(edgeFrame); edgeFrame = 0; }
+    function close() { reading?.close(); reading = null; cancel(); active = null; rendered = ''; timeline.reset(); lastRead = ''; nav.hidden = true; options.status(''); edgePending = false; historyLoading = false; intentUntil = 0; if (edgeFrame) root.cancelAnimationFrame(edgeFrame); edgeFrame = 0; }
     function open(kind, contact) {
       ensureOwner(); close();
       const key = contactKey(kind, contact); active = { key, kind, contact };
+      const identity = owner;
+      if (root.ElonReadingBookmarksUI && options.list) reading = root.ElonReadingBookmarksUI.mount({ list: options.list, owner: options.userId(), scope: { kind, id: contact.id },
+        current: () => owner === identity && session() === identity && active?.key === key, messages: () => snapshots.get(key) || [],
+        request: (method, path, body) => json(path, { method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) }),
+        history: value => { if (value) timeline.follow(false); navigation(); },
+        navigate: async target => { const previous = timeline.snapshot(); cancel(); historyLoading = false; edgePending = false; timeline.upgrade(); const page = await refresh(false, 'around', target); if (!page) { timeline.upgrade(previous.version); timeline.follow(previous.following); } return page?.target; },
+        latest: async () => { cancel(); historyLoading = false; edgePending = false; return !!await refresh(true, 'latest'); },
+        newer: () => timeline.snapshot().hasNewer && timeline.snapshot().version === 2 ? refresh(false, 'newer') : Promise.resolve(),
+      });
       if (!snapshots.has(key)) {
         const saved = cache.get(scopeKey(key)); if (Array.isArray(saved)) snapshots.set(key, saved);
       }
@@ -191,6 +207,7 @@
       cache.remove(scopeKey(key));
     }
     async function send(kind, contact, content, attachments = [], quoteSource = null, quote = null) {
+      reading?.suspend();
       ensureOwner(); const identity = owner, key = contactKey(kind, contact);
       const pending = { client_id: 'local-' + Date.now() + '-' + Math.random(), content, attachments, quote, outgoing: true, created_at: new Date().toISOString(), send_status: '发送中…' };
       outbox.set(key, (outbox.get(key) || []).concat(pending)); if (active?.key === key) paint(true);
@@ -200,7 +217,7 @@
         if (!data.message?.id) throw new Error('发送结果未确认，请刷新核对后再重试');
         Object.assign(pending, data.message, { send_status: '' });
         invalidate(kind, contact.id);
-        if (active?.key === key) { paint(true); await refresh(true, 'latest'); }
+        if (active?.key === key) { if (reading) await reading.latest(); else await refresh(true, 'latest'); }
         directories();
       } catch (error) {
         if (identity !== session()) return;

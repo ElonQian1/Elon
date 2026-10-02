@@ -222,7 +222,7 @@ internal class MainFriendChatActions(
 
     private fun createAdapter(messages: MutableList<ChatMessage>): ChatAdapter = ChatAdapter(
         messages = messages,
-        onMessageLongPress = showMessageActions,
+        onMessageLongPress = { view, message -> timelineNavigation.messageActions(view, message, showMessageActions) },
         onProjectShareAction = onProjectShareAction,
         onProjectShareLongPress = onProjectShareLongPress,
     )
@@ -429,6 +429,7 @@ internal class MainFriendChatActions(
         allowPendingRefresh: Boolean = false
     ) {
         if (!foreground || !ensureOwner() || activeFriend?.id != friend.id) return
+        if (scrollToBottom) timelineNavigation.prepareLatest()
         messagesByFriend.keys.filter { it != friend.id }.dropLast(9).forEach { id ->
             val pending = messagesByFriend[id].orEmpty().filter { it.id.isNullOrBlank() && !it.sendStatus.isNullOrBlank() }
             if (pending.isEmpty()) messagesByFriend.remove(id) else messagesByFriend[id] = pending.toMutableList()

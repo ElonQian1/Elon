@@ -20,6 +20,7 @@ interface Props {
   onQuote: () => void; onForward: () => void; onFavorite: () => void; onHide: () => void; onSelect: () => void; onMention?: () => void
   onSaved: (patch: MessageEdit) => void; onRecalled: () => void
   onAiReply?: () => void
+  onBookmark?: () => void
 }
 
 export default function SocialMessageMenu(props: Props) {
@@ -54,6 +55,7 @@ export default function SocialMessageMenu(props: Props) {
   }
   function render(edit?: () => void, history?: () => void) {
     const common: SocialMenuItem[] = [], revisions: SocialMenuItem[] = [], details: SocialMenuItem[] = []
+    if (props.onBookmark && !isPending(message)) common.push({ label: '添加阅读书签', icon: <History />, action: props.onBookmark })
     if (request && !isRecalled(message) && !isPending(message) && recordCard(message.content)) {
       if (props.onAiReply) common.push({ label: 'AI 分析记录…', icon: <Bot />, action: props.onAiReply })
       details.push({ label: '多选', icon: <ListChecks />, action: props.onSelect })

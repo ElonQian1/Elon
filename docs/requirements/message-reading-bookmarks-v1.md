@@ -1,7 +1,7 @@
 ---
 version_status: current
-decision_status: proposed
-implementation_status: pending
+decision_status: accepted
+implementation_status: partial
 reviewed_at: 2026-10-02
 owner: conversation-platform
 ---
@@ -12,8 +12,9 @@ owner: conversation-platform
 
 面向每周上线一次、需要爬楼、在多个讨论位置间往返的用户。群聊、好友聊天、
 自有个人 AI 对话与项目频道使用同一阅读语义，覆盖 APK、PWA 和 Win。
-本次完善需求及开发合同；书签 API、持久化、跨端同步和界面仍未实现。
-功能登记 `message-reading-bookmarks-v1` 保持 `proposed`，不能把文档完成写成产品上线。
+用户已授权实现与上线。群聊、好友首批由 `social-reading-bookmarks-v1` 独立登记，
+已编写书签 API、持久化、同步及三端入口；交付状态见[本批记录](../reports/social-reading-bookmarks-20261002.md)。
+父功能保留自有 AI/项目页面接入范围，不能把首批交付写成所有来源全部上线。
 
 依据是本会话提出的“多书签、跳转历史、继续阅读后保存各自进度”需求。
 基础见[统一消息时间线](message-timeline-v1.md)，
@@ -27,7 +28,7 @@ owner: conversation-platform
 4. 每次只加载目标附近的有限消息，书签数量增加不增加同时加载的聊天窗口。
 5. 书签不等于已读回执，也不自动扩大 AI 模型输入。
 
-以下具体默认值、同步策略与交付顺序为本轮补全的提案，尚未成为运行事实。
+以下是已接受的产品合同；实际接口与首批差异见技术设计和交付记录。
 
 ## 三种位置与一个示例
 

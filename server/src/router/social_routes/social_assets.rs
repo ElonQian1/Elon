@@ -8,6 +8,9 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         ("cache-control", "no-cache"),
     ];
     Router::new()
+        .route("/assets/reading_positions.js", get(move || async move { (headers, include_str!("../../assets/reading_positions.js")) }))
+        .route("/assets/reading_bookmarks_ui.js", get(move || async move { (headers, include_str!("../../assets/reading_bookmarks_ui.js")) }))
+        .route("/assets/reading_bookmarks.css", get(|| async { ([("content-type", "text/css; charset=utf-8"), ("cache-control", "no-cache")], include_str!("../../assets/reading_bookmarks.css")) }))
         .route("/assets/message_timeline.js", get(move || async move { (headers, include_str!("../../assets/message_timeline.js")) }))
         .route("/assets/scan_pwa.js", get(move || async move { (headers, include_str!("../../assets/scan_pwa.js")) }))
         .route("/assets/scanPayload.mjs", get(move || async move { (headers, include_str!("../../../../shared/scan/scanPayload.mjs")) }))

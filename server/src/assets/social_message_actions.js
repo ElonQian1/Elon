@@ -56,6 +56,7 @@
       const dialog = node('dialog', null, 'social-action-dialog'); menu = dialog; dialog.setAttribute('aria-label', '消息操作');
       const status = node('p'); status.setAttribute('role', 'status');
       dialog.append(node('h2', '消息操作'), node('p', summary(message), 'social-message-excerpt'));
+      dialog.append(button('添加阅读书签', () => { dismiss(); options.list.dispatchEvent(new CustomEvent('reading-bookmark', { detail: message })); }));
       dialog.append(button('引用', () => { quote = structuredClone(message); paintQuote(); dismiss(); options.input.focus(); }),
         button('复制', () => copyMessages([message])), button('转发', () => transfer([message])),
         button('多选', () => { selecting = true; selected.set(message.id, message); paintSelection(); dismiss(); }));
