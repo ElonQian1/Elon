@@ -36,7 +36,7 @@ internal object SocialMediaOpenPolicy {
         return listOfNotNull(share, item.url).distinct()
     }
     fun isShort(item: SocialLink): Boolean = SocialLinkPolicy.safeUrl(item.url)?.host in
-        setOf("v.douyin.com", "xhslink.com", "www.xhslink.com", "b23.tv")
+        setOf("v.douyin.com", "xhslink.com", "www.xhslink.com", "xhslink.cn", "www.xhslink.cn", "b23.tv")
     fun redirect(item: SocialLink, current: String, location: String): String? {
         val expected = platform(item) ?: return null
         val next = runCatching { SocialLinkPolicy.safeUrl(current)?.resolve(location)?.toString() }.getOrNull() ?: return null

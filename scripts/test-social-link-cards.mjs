@@ -31,6 +31,20 @@ assert.equal(links.links(xhs)[0].url, xhs);
 assert.equal(links.links(xhs + ' ' + xhs).length, 1);
 const xhsShare = `45 【一次看完多位画师卡位实拍，哪张击中你？✨ - OC猫 | 小红书 - 你的生活兴趣社区】 😆 vEtl5AZaiF1Cpm2 😆 ${xhs}`;
 const sharedXhs = links.links(xhsShare)[0];
+for (const [title, url, suffix] of [
+  ['游戏创作的天塌了，AI 黑科技它来了！', 'https://xhslink.cn/o/7QvqZwsx2Ch', '跳转【小红书】看看这篇分享！'],
+  ['帮助你做游戏的项目，将做游戏的门槛拉低', 'https://xhslink.cn/o/4Oatsa1J8RD', '带上口令，来【小红书】看笔记全文~'],
+]) {
+  const share = `${title} ${url} ${suffix}`, item = links.links(share)[0];
+  assert.equal(item.site, '小红书'); assert.equal(item.title, title); assert.equal(item.author, '');
+  assert.equal(links.mediaPresentation(item).kind, 'note'); assert.equal(item.embed, null);
+  assert.equal(links.compact(share), false, 'unbracketed message text must not hide user comments');
+  assert.equal(links.links(`My comment\n${share}`)[0].title, '');
+  assert.equal(links.links(`${share} extra comment`)[0].title, '');
+  assert.equal(links.sanitize({ schema: 1, url, site: 'xhslink.cn', title: '小红书', status: 'unavailable' }, item).title, title);
+}
+for (const host of ['xhslink.com', 'www.xhslink.com', 'xhslink.cn', 'www.xhslink.cn']) assert.equal(links.mediaPresentation(links.links(`https://${host}/o/example`)[0]).kind, 'note');
+assert.equal(links.mediaPresentation(links.links('https://xhslink.cn.evil.example/o/test')[0]), null);
 assert.equal(sharedXhs.title, '一次看完多位画师卡位实拍，哪张击中你？✨');
 assert.equal(sharedXhs.author, 'OC猫');
 assert.equal(links.presentation(sharedXhs).source, '小红书 · OC猫');
@@ -94,6 +108,7 @@ for (const [url, kind, symbol] of [
   ['https://www.bilibili.com/video/BV19eYH6NEsC/', 'bilibili', '▶'],
   ['https://v.douyin.com/_XMEsxVKKOY/', 'douyin', '▶'],
   [xhs, 'note', '↗'],
+  ['https://xhslink.cn/o/7QvqZwsx2Ch', 'note', '↗'],
 ]) {
   const item = links.links(url)[0], host = new Node('host'); let opened;
   assert.equal(links.mediaPresentation(item).kind, kind);

@@ -8,7 +8,7 @@ internal object SocialLinkPresentation {
         return when (item.site) {
             "哔哩哔哩" -> item.player != null || url.host == "b23.tv" && url.path != "/"
             "抖音" -> item.player != null || url.host == "v.douyin.com" && url.path != "/"
-            "小红书" -> Regex("/(?:explore|discovery/item)/[A-Za-z0-9]+").containsMatchIn(url.path) || url.host in listOf("xhslink.com", "www.xhslink.com") && url.path != "/"
+            "小红书" -> Regex("/(?:explore|discovery/item)/[A-Za-z0-9]+").containsMatchIn(url.path) || url.host in listOf("xhslink.com", "www.xhslink.com", "xhslink.cn", "www.xhslink.cn") && url.path != "/"
             else -> false
         }
     }

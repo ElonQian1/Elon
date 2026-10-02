@@ -3,6 +3,7 @@
   const sites = {
     'mp.weixin.qq.com': '微信公众号', 'douyin.com': '抖音', 'www.douyin.com': '抖音', 'v.douyin.com': '抖音',
     'www.iesdouyin.com': '抖音', 'xiaohongshu.com': '小红书', 'www.xiaohongshu.com': '小红书', 'xhslink.com': '小红书', 'www.xhslink.com': '小红书',
+    'xhslink.cn': '小红书', 'www.xhslink.cn': '小红书',
     'bilibili.com': '哔哩哔哩', 'www.bilibili.com': '哔哩哔哩', 'm.bilibili.com': '哔哩哔哩', 'b23.tv': '哔哩哔哩',
     'binance.com': '币安广场', 'www.binance.com': '币安广场', 'app.binance.com': '币安广场', 'x.com': 'X', 'www.x.com': 'X', 'twitter.com': 'X', 'www.twitter.com': 'X', 'mobile.twitter.com': 'X', 't.co': 'X',
   };
@@ -34,7 +35,7 @@
     const url = safeUrl(value.url), path = url?.pathname || '';
     if (value.site === '哔哩哔哩' && (value.embed?.kind === 'bilibili' || url?.hostname === 'b23.tv' && path !== '/')) return { kind: 'bilibili', ratio: 16 / 9, action: '打开哔哩哔哩视频', play: true };
     if (value.site === '抖音' && (value.embed?.kind === 'douyin' || url?.hostname === 'v.douyin.com' && path !== '/')) return { kind: 'douyin', ratio: 3 / 4, action: '打开抖音视频', play: true };
-    if (value.site === '小红书' && (/\/(?:explore|discovery\/item)\/[A-Za-z0-9]+/.test(path) || /^(?:www\.)?xhslink\.com$/.test(url?.hostname || '') && path !== '/')) return { kind: 'note', ratio: 3 / 4, action: '查看小红书笔记', play: false };
+    if (value.site === '小红书' && (/\/(?:explore|discovery\/item)\/[A-Za-z0-9]+/.test(path) || /^(?:www\.)?xhslink\.(?:com|cn)$/.test(url?.hostname || '') && path !== '/')) return { kind: 'note', ratio: 3 / 4, action: '查看小红书笔记', play: false };
     return null;
   }
   const readers = new Set();
@@ -54,13 +55,15 @@
     const clean = String(title || '').replace(/\s+/g, '').toLowerCase();
     return !clean || clean === site.toLowerCase() || ['小红书-你的生活兴趣社区', '小红书–你的生活兴趣社区', '微信公众平台', '微信公众号', '环境异常', '安全验证', '访问验证', '抖音-记录美好生活'].includes(clean);
   }
-  function shareTitle(raw, site, nearby = '') {
+  function shareTitle(raw, site, nearby = '', after = '') {
     if (site === '哔哩哔哩') raw = biliShareGroups(nearby)?.find(t => !t.startsWith('精准空降')) || raw;
     if (site === '抖音') {
       const match = nearby.match(/看看【([^】]+)的作品】\s*(\S[\s\S]*)$/u);
       if (match) return { title: match[2].trim().slice(0, 160), author: match[1].slice(0, 80) };
     }
     if (site !== '小红书') return { title: raw.slice(0, 160), author: '' };
+    const prefix = nearby.trim();
+    if (prefix && prefix.length <= 160 && !/[\r\n]|https?:\/\//.test(prefix) && /^(?:跳转【小红书】看看这篇分享[！!]?|带上口令[，,]\s*来【小红书】看笔记全文[~～]?)$/.test(after.trim())) return { title: prefix, author: '' };
     const parts = raw.split(' | 小红书')[0].split(' - ');
     return parts.length > 1 ? { title: parts.slice(0, -1).join(' - ').slice(0, 160), author: parts.at(-1).slice(0, 80) } : { title: raw.slice(0, 160), author: '' };
   }
@@ -142,7 +145,7 @@
       const site = channelsId(u.href) ? '视频号' : siteOf(u);
       const nearby = text.slice(Math.max(0, match.index - 300), match.index);
       const title = [...nearby.matchAll(/【([^】]+)】/g)].map(m => m[1]).find(t => !t.startsWith('精准空降')) || '';
-      result.push({ schema: 1, url: u.href, site, ...shareTitle(title, site, nearby), description: '', image: null, embed: embed(u.href), status: 'unavailable', source: 'server' });
+      result.push({ schema: 1, url: u.href, site, ...shareTitle(title, site, nearby, text.slice(match.index + match[0].length)), description: '', image: null, embed: embed(u.href), status: 'unavailable', source: 'server' });
       if (result.length === 2) break;
     }
     return result;

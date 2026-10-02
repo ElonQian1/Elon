@@ -7,13 +7,16 @@ internal object SocialLinkShareText {
         return clean.isBlank() || clean == site.lowercase() || clean in setOf(
             "小红书-你的生活兴趣社区", "小红书–你的生活兴趣社区", "微信公众平台", "微信公众号", "环境异常", "安全验证", "访问验证", "抖音-记录美好生活")
     }
-    fun title(raw: String, site: String, nearby: String = ""): Pair<String, String> {
+    fun title(raw: String, site: String, nearby: String = "", after: String = ""): Pair<String, String> {
         if (site == "哔哩哔哩") return (biliShareGroups(nearby)?.firstOrNull { !it.startsWith("精准空降") } ?: raw).take(160) to ""
         if (site == "抖音") {
             val match = Regex("看看【([^】]+)的作品】\\s*(\\S[\\s\\S]*)$").find(nearby)
             if (match != null) return match.groupValues[2].trim().take(160) to match.groupValues[1].take(80)
         }
         if (site != "小红书") return raw.take(160) to ""
+        val prefix = nearby.trim()
+        if (prefix.isNotEmpty() && prefix.length <= 160 && !Regex("[\\r\\n]|https?://").containsMatchIn(prefix) &&
+            Regex("^(?:跳转【小红书】看看这篇分享[！!]?|带上口令[，,]\\s*来【小红书】看笔记全文[~～]?)$").matches(after.trim())) return prefix to ""
         val split = raw.substringBefore(" | 小红书").split(" - ")
         return if (split.size > 1) split.dropLast(1).joinToString(" - ").take(160) to split.last().take(80) else raw.take(160) to ""
     }

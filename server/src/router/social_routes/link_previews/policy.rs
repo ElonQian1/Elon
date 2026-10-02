@@ -35,7 +35,12 @@ pub(super) fn site(url: &Url) -> &'static str {
     match url.host_str().unwrap_or("") {
         "mp.weixin.qq.com" => "微信公众号",
         "douyin.com" | "www.douyin.com" | "v.douyin.com" | "www.iesdouyin.com" => "抖音",
-        "xiaohongshu.com" | "www.xiaohongshu.com" | "xhslink.com" | "www.xhslink.com" => "小红书",
+        "xiaohongshu.com"
+        | "www.xiaohongshu.com"
+        | "xhslink.com"
+        | "www.xhslink.com"
+        | "xhslink.cn"
+        | "www.xhslink.cn" => "小红书",
         "bilibili.com" | "www.bilibili.com" | "m.bilibili.com" | "b23.tv" => "哔哩哔哩",
         "binance.com" | "www.binance.com" | "app.binance.com" => "币安广场",
         "x.com" | "www.x.com" | "twitter.com" | "www.twitter.com" | "mobile.twitter.com"
@@ -65,6 +70,8 @@ pub(super) fn label(url: &Url) -> String {
 // to allow-listed crawler agents (verified 2026-09: Twitterbot/facebookexternalhit are challenged).
 pub(super) fn user_agent(url: &Url) -> &'static str {
     match site(url) {
+        // Public mobile shares include same-note hydration; desktop shares may return a login shell.
+        "小红书" => "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
         "币安广场" => "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
         _ => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 YilongLinkPreview/1.0",
     }

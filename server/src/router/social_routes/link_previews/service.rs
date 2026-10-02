@@ -17,6 +17,9 @@ mod report;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "xiaohongshu_tests.rs"]
+mod xiaohongshu_tests;
 pub(super) use report::Read;
 pub(super) fn public_url(value: &str) -> Option<reqwest::Url> {
     policy::public_url(value)

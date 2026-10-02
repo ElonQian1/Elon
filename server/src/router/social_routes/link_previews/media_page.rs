@@ -118,7 +118,10 @@ fn fields(item: &Value, kind: &str, base: &Url) -> Option<metadata::Metadata> {
     if title.is_empty() {
         return None;
     }
-    let author = metadata::clean(&text(&["/author/nickname", "/user/nickname"]), 80);
+    let author = metadata::clean(
+        &text(&["/author/nickname", "/user/nickname", "/user/nickName"]),
+        80,
+    );
     let raw = if kind == "douyin" {
         text(&["/video/origin_cover/url_list/0", "/video/cover/url_list/0"])
     } else {
