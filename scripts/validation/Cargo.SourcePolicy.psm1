@@ -177,14 +177,14 @@ function Test-CargoSourceCircuitOpen {
     param([Parameter(Mandatory)]$State, [Parameter(Mandatory)][string]$SourceId)
     $record = $State.sources.$SourceId
     if (-not $record -or -not $record.circuit_until_utc) { return $false }
-    try { return [DateTime]::Parse([string]$record.circuit_until_utc).ToUniversalTime() -gt [DateTime]::UtcNow } catch { return $false }
+    try { return ([DateTime]$record.circuit_until_utc).ToUniversalTime() -gt [DateTime]::UtcNow } catch { return $false }
 }
 
 function Test-CargoSourceHealthFresh {
     param([Parameter(Mandatory)]$State, [Parameter(Mandatory)][string]$SourceId, [int]$TtlSeconds = 600)
     $record = $State.sources.$SourceId
     if (-not $record -or $record.status -ne 'healthy' -or -not $record.checked_utc) { return $false }
-    try { return ([DateTime]::UtcNow - [DateTime]::Parse([string]$record.checked_utc).ToUniversalTime()).TotalSeconds -le $TtlSeconds } catch { return $false }
+    try { return ([DateTime]::UtcNow - ([DateTime]$record.checked_utc).ToUniversalTime()).TotalSeconds -le $TtlSeconds } catch { return $false }
 }
 
 function Update-CargoSourceHealthState {

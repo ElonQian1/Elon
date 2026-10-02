@@ -59,7 +59,11 @@ function Invoke-CargoManagedAttempt {
     $priorCargoHome=[Environment]::GetEnvironmentVariable('CARGO_HOME','Process')
     try {
         if($CargoHome){$env:CARGO_HOME=$CargoHome}
-        $result=Invoke-ValidationCapturedProcess -FilePath 'powershell' -ArgumentList $arguments -WorkingDirectory $RepoRoot -EvidenceDirectory $EvidenceDirectory -TimeoutSeconds $TimeoutSeconds
+        # Keep the caller's runtime: WinPS 5.1 CodeDOM cannot compile Add-Type in a UNC TEMP.
+        # Capacity admission and the managed Cargo wrapper still run unchanged in the child.
+        $hostName=if($PSVersionTable.PSVersion.Major -ge 7){'pwsh'}else{'powershell'}
+        if($env:OS -eq 'Windows_NT'){$hostName += '.exe'; $arguments=@('-WindowStyle','Hidden')+$arguments}
+        $result=Invoke-ValidationCapturedProcess -FilePath (Join-Path $PSHOME $hostName) -ArgumentList $arguments -WorkingDirectory $RepoRoot -EvidenceDirectory $EvidenceDirectory -TimeoutSeconds $TimeoutSeconds
     } finally {
         if($null -eq $priorCargoHome){Remove-Item Env:CARGO_HOME -ErrorAction SilentlyContinue}else{$env:CARGO_HOME=$priorCargoHome}
     }

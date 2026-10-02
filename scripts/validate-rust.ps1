@@ -106,7 +106,10 @@ try {
         stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
     })
     try {
-        $result = Invoke-ValidationCapturedProcess -FilePath "powershell" -ArgumentList $args -WorkingDirectory $RepoRoot -EvidenceDirectory $resultDir -TimeoutSeconds $WaitTimeoutSeconds
+        # Preserve the caller runtime through both orchestration layers (including UNC TEMP support).
+        $hostName = if ($PSVersionTable.PSVersion.Major -ge 7) { 'pwsh' } else { 'powershell' }
+        if ($env:OS -eq 'Windows_NT') { $hostName += '.exe'; $args = @('-WindowStyle','Hidden') + $args }
+        $result = Invoke-ValidationCapturedProcess -FilePath (Join-Path $PSHOME $hostName) -ArgumentList $args -WorkingDirectory $RepoRoot -EvidenceDirectory $resultDir -TimeoutSeconds $WaitTimeoutSeconds
     } catch {
         $failedAt = [DateTime]::UtcNow.ToString("o")
         Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
