@@ -13,6 +13,7 @@ function Preview() {
   const [role, setRole] = useState('member')
   const [selection, setSelection] = useState('')
   const source = scenario === 'main' ? manifest
+    : scenario === 'shop' ? catalog.projects.find(project => project.id === 'cofficethinking')?.landing
     : scenario === 'child' ? catalog.projects.find(project => project.id === 'yilong-quant')?.landing
     : null
   const landing = source ? {
@@ -30,7 +31,7 @@ function Preview() {
     <aside style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', color: 'var(--text)' }}>
       <strong>离线布局示例，不连接真实项目</strong>
       <label>项目 <select aria-label="预览项目" value={scenario} onChange={event => setScenario(event.target.value)}>
-        <option value="main">一龙主项目</option><option value="child">子项目</option><option value="empty">无介绍配置</option>
+        <option value="main">一龙主项目</option><option value="child">子项目</option><option value="shop">商店网页入口</option><option value="empty">无介绍配置</option>
       </select></label>
       <label>身份 <select aria-label="成员身份" value={role} onChange={event => setRole(event.target.value)}><option value="member">成员</option><option value="visitor">访客</option><option value="viewer">只读成员</option></select></label>
       <label>加入方式 <select aria-label="加入方式" value={mode} onChange={event => setMode(event.target.value)}>
@@ -38,7 +39,7 @@ function Preview() {
       </select></label>
       <output aria-live="polite">{selection && `已选择频道：${selection}`}</output>
     </aside>
-    <ProjectLanding project={{ id: scenario === 'main' ? 'elon-self' : 'offline-preview', name: scenario === 'main' ? '一龙 AI' : scenario === 'child' ? '子项目介绍示例' : '尚未配置介绍的项目', role, join_mode: mode, member_count: 3 }} channels={channels} landing={landing} onSelectChannel={setSelection} onOpenMembers={() => setSelection('members')} />
+    <ProjectLanding project={{ id: scenario === 'main' ? 'elon-self' : 'offline-preview', name: scenario === 'main' ? '一龙 AI' : scenario === 'child' ? '子项目介绍示例' : scenario === 'shop' ? '一龙商户经营系统' : '尚未配置介绍的项目', role, join_mode: mode, member_count: 3 }} channels={channels} landing={landing} onSelectChannel={setSelection} onOpenMembers={() => setSelection('members')} />
   </>
 }
 

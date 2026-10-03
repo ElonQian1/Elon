@@ -45,6 +45,19 @@ try {
   await page.getByRole('heading', { name: '子项目介绍示例', exact: true }).waitFor()
   assert.ok(await page.locator('#project-capabilities > ul > li').count() > 4, 'child must retain the complete capability list')
   assert.ok((await page.locator('body').innerText()).includes('不接收或移动真实用户资金'))
+  await page.getByLabel('预览项目').selectOption('shop')
+  await page.evaluate(() => {
+    window.__TAURI__ = { core: { invoke: async () => { throw new Error('Offline fixture must not invoke native commands') } } }
+    window.open = () => { throw new Error('Desktop entry must not open an external window') }
+  })
+  await page.getByRole('button', { name: '打开网页端 使用项目网页应用 打开', exact: true }).click()
+  const webTabs = await page.evaluate(async () => {
+    const { useReaderTabs } = await import('/pc/src/features/reader/readerTabsStore.ts')
+    return useReaderTabs.getState().tabs.map(tab => ({ url: tab.url, title: tab.title }))
+  })
+  assert.deepEqual(webTabs, [{ url: 'https://182.254.168.75/', title: '一龙商户经营系统' }])
+  assert.equal(await page.getByRole('alert').count(), 0)
+  await page.screenshot({ path: path.join(output, 'shop-web-entry.png'), fullPage: true })
   await page.getByLabel('预览项目').selectOption('empty')
   await page.getByRole('heading', { name: '尚未配置介绍的项目', exact: true }).waitFor()
   assert.ok((await page.locator('#project-capabilities').innerText()).includes('尚未提供能力清单'))

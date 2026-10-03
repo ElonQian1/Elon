@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { useState } from 'react'
 import {
   ArrowRight,
   CircleCheck,
@@ -20,6 +21,7 @@ import ProjectLandingDownloads, {
 import QuantPaperLaunch from './QuantPaperLaunch'
 import ProjectIntroduction from './ProjectIntroduction'
 import { resolveProjectLandingContent } from './projectLandingContent'
+import { openProjectWeb, projectWebUrl } from './projectWebEntry'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -51,6 +53,14 @@ interface WorkflowItem {
 
 export default function ProjectLanding({ project, channels, landing: configuredLanding, onSelectChannel, onOpenMembers }: Props) {
   const landing = resolveProjectLandingContent(project.id, configuredLanding)
+  const webUrl = projectWebUrl(landing?.web_url)
+  const [webError, setWebError] = useState('')
+  const openWeb = () => {
+    if (!webUrl) return
+    setWebError('')
+    try { openProjectWeb(webUrl, project.name, project.id) }
+    catch (error) { setWebError(error instanceof Error ? error.message : '网页端暂时无法打开，请重试。') }
+  }
   const devChannel = channels.find((channel) => channel.kind === 'ai_development')
   const buildChannel = channels.find((channel) => channel.kind === 'builds')
   const downloads = landing?.downloads ?? []
@@ -63,7 +73,9 @@ export default function ProjectLanding({ project, channels, landing: configuredL
   const tagline = landing?.tagline || project.description || '项目空间'
   const description = landing?.summary || landing?.description || project.description || '项目尚未提供介绍，可从现有频道和资料了解当前内容。'
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
-  const primaryAction = buildPrimaryAction({ project, devChannel, buildChannel, firstDownload, resources, onSelectChannel, onOpenMembers })
+  const primaryAction: PrimaryAction = webUrl
+    ? { icon: ExternalLink, title: '打开网页端', detail: '使用项目网页应用', label: '打开', onClick: openWeb }
+    : buildPrimaryAction({ project, devChannel, buildChannel, firstDownload, resources, onSelectChannel, onOpenMembers })
   const workflow = buildWorkflow({ devChannel, buildChannel, availableDownloads, onSelectChannel })
   const quantPaperLaunch = project.id === 'yilong-quant'
     && landing?.paper_launch?.schema === 'yilong.quant.paper_launch.v1'
@@ -97,6 +109,7 @@ export default function ProjectLanding({ project, channels, landing: configuredL
         </div>
 
         <div className={styles.actionPanel}>
+          {webError && <p role="alert">{webError}</p>}
           <button
             className={styles.primaryAction}
             type="button"
@@ -148,7 +161,7 @@ export default function ProjectLanding({ project, channels, landing: configuredL
           {resources.length > 0 && (
             <div className={styles.resourceList}>
               {resources.map((resource) => (
-                <button className={styles.resourceLink} type="button" key={`${resource.label}-${resource.url}`} onClick={() => openUrl(resource.url)}>
+                <button className={styles.resourceLink} type="button" key={`${resource.label}-${resource.url}`} onClick={() => webUrl && projectWebUrl(resource.url) === webUrl ? openWeb() : openUrl(resource.url)}>
                   <FileText size={14} aria-hidden="true" />
                   <span>{resource.label}</span>
                   <ExternalLink size={13} aria-hidden="true" />
