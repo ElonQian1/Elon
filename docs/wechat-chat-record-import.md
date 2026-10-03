@@ -52,6 +52,8 @@ Android 同时接收 `ACTION_SEND` 和 `ACTION_SEND_MULTIPLE` 的 ZIP。实际�
 
 群聊启用长按后文字区域吞点击的回归及真实触摸验收见 [记录卡片点击修复](reports/wechat-record-card-tap-20261003.md)。
 
+特殊卡片的菜单采用增量组合，通用引用、多选、书签等不因展示类型被替换；见 [聊天记录消息菜单](reports/wechat-record-message-menu-20261003.md)。
+
 Android 二次打开采用 [近期缓存先显示与本地管理](reports/wechat-record-cache-reopen-20260929.md)：5 分钟验证窗口、正文与媒体分队列、关闭即取消、128 MiB/7 天回收及手动清理。该策略替代旧报告中 Android 每次等待网络复核的规则。
 
 PC/Win 使用 [附件本地缓存](reports/win-record-media-cache-20261003.md)：正文每次复核权限，附件复用 32 MiB 内存与 128 MiB/7 天磁盘缓存；嵌套返回和重开不重复下载，更多菜单可清理本条缓存。PWA 保留 HTTP 条件缓存策略。

@@ -1333,7 +1333,7 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showStoreDialog = { storeController.showStoreDialog() },
-            shareAiMessage = { message, plain -> aiConversationShares.forwardOne(message, plain) }
+            shareAiMessage = { message, plain -> aiConversationShares.forwardOne(message, plain) }, additionalMessageActions = { groupChatActions.readingActions(it) + friendChatActions.readingActions(it) }
         )
     }
 

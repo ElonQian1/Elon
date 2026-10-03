@@ -39,6 +39,7 @@ internal class MainFriendChatActions(
         protectSocialChatRows(messagesByFriend[key.removePrefix("friend:")].orEmpty(), rows)
     }.apply { canMarkRead = { foreground && activity.hasWindowFocus() && !binding.chatList.canScrollVertically(1) } }
     private val timelineNavigation by lazy { MessageTimelineNavigation(binding, reader) }
+    fun readingActions(message: ChatMessage): List<TopAction> = if (isActive()) timelineNavigation.messageActions(message) else emptyList()
     private var owner = AuthManager.userId(activity)
     private val quotes = com.elon.app.socialquotes.SocialQuoteComposer(binding)
     fun quoteMessage(message: ChatMessage): Boolean = isActive() && quotes.select(message)
@@ -222,7 +223,7 @@ internal class MainFriendChatActions(
 
     private fun createAdapter(messages: MutableList<ChatMessage>): ChatAdapter = ChatAdapter(
         messages = messages,
-        onMessageLongPress = { view, message -> timelineNavigation.messageActions(view, message, showMessageActions) },
+        onMessageLongPress = showMessageActions,
         onProjectShareAction = onProjectShareAction,
         onProjectShareLongPress = onProjectShareLongPress,
     )

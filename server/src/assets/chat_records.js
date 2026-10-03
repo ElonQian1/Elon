@@ -103,5 +103,6 @@
     bubble.replaceChildren(); const n = button('', () => open(card, options)); n.className = 'chat-record-card';
     n.append(el('strong', card.title), el('span', card.summary), el('small', `聊天记录 · ${card.message_count} 条`)); bubble.append(n); return true;
   }
-  window.ElonChatRecords = { reference, mount, open, close: () => closeActive?.() };
+  const summary = text => { const card = reference(text); return card ? '[聊天记录] ' + card.title : null; };
+  window.ElonChatRecords = { reference, summary, mount, open, close: () => closeActive?.() };
 })();

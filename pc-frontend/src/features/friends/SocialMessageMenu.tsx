@@ -11,6 +11,7 @@ import { canRecall, isPending, isRecalled, messageEndpoint, messageText, socialR
 import styles from './SocialMessageMenu.module.css'
 import tools from './SocialTools.module.css'
 import { recordCard } from './chat-records/recordApi'
+import ChatRecordReader from './chat-records/ChatRecordReader'
 import { openImageScan } from '../scan/scanEntry'
 import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
 
@@ -30,11 +31,16 @@ export default function SocialMessageMenu(props: Props) {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [reading, setReading] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const alive = useRef(true)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => { if (notice) { const timer = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(timer) } }, [notice])
-  const usable = !isRecalled(message) && !isPending(message) && !special
+  const available = !isRecalled(message) && !isPending(message)
+  const record = recordCard(message.content)
+  const usable = available && !special
+  const commonActions = available && (!special || !!record)
+  useEffect(() => { setReading(false) }, [message.content, message.recalled_at])
   async function copy(rich = false) {
     const text = request?.selection || messageText(message)
     const result = rich ? await copyRichTextToClipboard(sanitizedRichHtmlFromElement(document.getElementById(props.copySourceId)), text) : await copyTextToClipboard(text)
@@ -56,9 +62,12 @@ export default function SocialMessageMenu(props: Props) {
   function render(edit?: () => void, history?: () => void) {
     const common: SocialMenuItem[] = [], revisions: SocialMenuItem[] = [], details: SocialMenuItem[] = []
     if (props.onBookmark && !isPending(message)) common.push({ label: '添加阅读书签', icon: <History />, action: props.onBookmark })
-    if (request && !isRecalled(message) && !isPending(message) && recordCard(message.content)) {
+    if (request && available && record) {
+      common.push({ label: '打开聊天记录', icon: <FileText />, action: () => setReading(true) },
+        { label: '复制标题', icon: <Copy />, action: () => void mediaAction(async () => {
+          if (!await copyTextToClipboard(record.title)) throw new Error('复制失败，请重试')
+        }, '已复制标题') })
       if (props.onAiReply) common.push({ label: 'AI 分析记录…', icon: <Bot />, action: props.onAiReply })
-      details.push({ label: '多选', icon: <ListChecks />, action: props.onSelect })
     }
     if (usable && request) {
       const link = request.link
@@ -91,11 +100,15 @@ export default function SocialMessageMenu(props: Props) {
       }
       if (request.selection || (!attachment && message.content.trim())) common.push({ label: request.selection ? '复制选中文字' : '复制', icon: <Copy />, action: () => void copy() })
       if (!attachment && !request.selection && document.getElementById(props.copySourceId)?.querySelector('p,pre,blockquote,ul,ol,table')) common.push({ label: '复制富文本', icon: <FileText />, action: () => void copy(true) })
-      common.push({ label: '引用', icon: <Reply />, action: props.onQuote }, { label: '转发…', icon: <Forward />, action: props.onForward },
-        { label: props.favorite ? '取消收藏' : '收藏', hint: '仅此设备', icon: <Star />, action: props.onFavorite })
       if (props.onAiReply) common.push({ label: 'AI 回复…', icon: <Bot />, action: props.onAiReply })
       if (edit) revisions.push({ label: '编辑', icon: <Pencil />, action: edit })
       if (history) revisions.push({ label: '修改记录', icon: <History />, action: history })
+    }
+    // Specialized presentation must not remove the ordinary message operations.
+    if (commonActions && request) {
+      common.push({ label: '引用', icon: <Reply />, action: props.onQuote },
+        { label: '转发…', icon: <Forward />, action: props.onForward, disabled: !!record, hint: record ? '暂不支持跨群转发记录' : undefined },
+        { label: props.favorite ? '取消收藏' : '收藏', hint: '仅此设备', icon: <Star />, action: props.onFavorite })
       if (canRecall(message, own)) revisions.push({ label: '撤回…', icon: <Undo2 />, action: () => { setError(''); setDialog('recall') } })
       details.push({ label: '多选', icon: <ListChecks />, action: props.onSelect })
       if (props.onMention) details.push({ label: '@ 发送者', icon: <AtSign />, action: props.onMention })
@@ -113,11 +126,12 @@ export default function SocialMessageMenu(props: Props) {
     </>
   }
   return <>
+    {reading && available && record && conversation.kind === 'group' && record.group_id === conversation.id && <ChatRecordReader card={record} onClose={() => setReading(false)} />}
     {conversation.kind === 'group' && usable ? <GroupMessageRevisionActions groupId={conversation.id} message={message} own={own} onSaved={props.onSaved}
       renderActions={actions => render(actions.editable ? actions.edit : undefined, actions.edited ? actions.history : undefined)} /> : render()}
     {dialog && <SocialDialog title={dialog === 'recall' ? '撤回消息' : '消息详情'} onClose={() => setDialog(null)} busy={busy}
       footer={dialog === 'recall' ? <><button type="button" disabled={busy} onClick={() => setDialog(null)}>取消</button><button type="button" disabled={busy} onClick={() => void recall()}>{busy ? '正在撤回…' : '确认撤回'}</button></> : undefined}>
-      {dialog === 'recall' ? <><p>撤回后，所有参与者将看到撤回提示。仅支持本人发送后 1 分钟内的消息。</p><pre>{messageText(message)}</pre></> : <><p>发送时间：{new Date(message.created_at).toLocaleString()}</p>{message.edited_at && <p>最后修改：{new Date(message.edited_at).toLocaleString()}</p>}<p className={tools.hint}>本人消息发送后 1 分钟内可撤回。收藏与隐藏只保存在此设备。</p></>}
+      {dialog === 'recall' ? <><p>撤回后，所有参与者将看到撤回提示。仅支持本人发送后 1 分钟内的消息。</p><pre>{record ? `[聊天记录] ${record.title}` : messageText(message)}</pre></> : <><p>发送时间：{new Date(message.created_at).toLocaleString()}</p>{message.edited_at && <p>最后修改：{new Date(message.edited_at).toLocaleString()}</p>}<p className={tools.hint}>本人消息发送后 1 分钟内可撤回。收藏与隐藏只保存在此设备。</p></>}
       {error && <p className={tools.error} role="alert">{error}</p>}
     </SocialDialog>}
   </>

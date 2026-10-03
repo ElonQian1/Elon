@@ -3,10 +3,11 @@
   const node = (tag, text, cls) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (cls) el.className = cls; return el; };
   const allowed = message => message?.id && !message.recalled_at && !message.recalledAt && !message.send_status;
   const signature = message => JSON.stringify([message?.revision || 1, message?.content, message?.attachments, message?.recalled_at, message?.recalledAt]);
-  const summary = message => (message.sender_name ? message.sender_name + '：' : '') + (root.ElonGridShare?.summary(message.content) || message.content || (message.attachments || []).map(a => '[' + (a.kind === 'image' ? '图片' : a.kind === 'voice' ? '语音' : '附件') + '] ' + (a.display_name || a.file_name || '')).join(' '));
+  const record = message => root.ElonChatRecords?.reference(message?.content);
+  const summary = message => (message.sender_name ? message.sender_name + '：' : '') + (root.ElonChatRecords?.summary(message.content) || root.ElonGridShare?.summary(message.content) || message.content || (message.attachments || []).map(a => '[' + (a.kind === 'image' ? '图片' : a.kind === 'voice' ? '语音' : '附件') + '] ' + (a.display_name || a.file_name || '')).join(' '));
   function button(label, action, cls) { const el = node('button', label, cls); el.type = 'button'; el.onclick = action; return el; }
   function create(options) {
-    let key = '', owner = '', rows = new Map(), ordered = [], quote = null, selecting = false, menu = null, closeTransfer = null, suppress = 0;
+    let key = '', owner = '', rows = new Map(), ordered = [], quote = null, selecting = false, menu = null, menuSource = null, closeTransfer = null, suppress = false;
     const selected = new Map(), bindings = new Map();
     const bar = node('div', null, 'social-quote-compose'), preview = node('span'), cover = node('img'); cover.alt = ''; cover.hidden = true;
     const cancel = button('×', () => { quote = null; paintQuote(); options.input.focus(); }, 'social-icon-button'); cancel.title = '取消引用'; cancel.setAttribute('aria-label', '取消引用');
@@ -33,7 +34,8 @@
       cover.onerror = () => { cover.hidden = true; };
     }
     function paintSelection() {
-      selection.hidden = !selecting; count.textContent = `已选择 ${selected.size} 条`; forward.disabled = copy.disabled = !selected.size;
+      selection.hidden = !selecting; count.textContent = `已选择 ${selected.size} 条`; forward.disabled = copy.disabled = !selected.size || chosen().some(record);
+      forward.title = copy.title = chosen().some(record) ? '聊天记录不能作为普通文字复制或跨群转发' : '';
       bindings.forEach(({ block, check }, id) => { check.hidden = !selecting; check.checked = selected.has(id); block.classList.toggle('social-message-selecting', selecting); block.classList.toggle('social-message-selected', selecting && selected.has(id)); });
     }
     function toggle(message) {
@@ -43,23 +45,32 @@
       else report('每次最多选择 20 条消息');
       paintSelection();
     }
-    function dismiss() { if (menu) { const old = menu; menu = null; old.close(); old.remove(); } }
+    function dismiss() { menuSource = null; if (menu) { const old = menu; menu = null; old.close(); old.remove(); } }
     async function copyMessages(messages) {
-      if (!messages.length || !messages.every(valid)) return;
+      if (!messages.length || !messages.every(valid) || messages.some(record)) return;
       const env = context(messages); report('');
       try { await root.ElonSocialMessageTransfer.copy(messages, env); if (env.current()) { report('已复制'); dismiss(); } }
       catch (error) { if (env.current()) { report(error.message || '复制失败，请使用转发'); const status = menu?.querySelector('[role="status"]'); if (status) status.textContent = notice.textContent; } }
     }
-    function transfer(messages) { if (!messages.length || !messages.every(valid)) return; dismiss(); closeTransfer?.(); closeTransfer = root.ElonSocialMessageTransfer.forward(messages, context(messages)); }
+    function transfer(messages) { if (!messages.length || !messages.every(valid) || messages.some(record)) return; dismiss(); closeTransfer?.(); closeTransfer = root.ElonSocialMessageTransfer.forward(messages, context(messages)); }
     function show(message, block) {
       if (!valid(message)) return; dismiss();
-      const dialog = node('dialog', null, 'social-action-dialog'); menu = dialog; dialog.setAttribute('aria-label', '消息操作');
+      const dialog = node('dialog', null, 'social-action-dialog'); menu = dialog; menuSource = structuredClone(message); dialog.setAttribute('aria-label', '消息操作');
       const status = node('p'); status.setAttribute('role', 'status');
       dialog.append(node('h2', '消息操作'), node('p', summary(message), 'social-message-excerpt'));
       dialog.append(button('添加阅读书签', () => { dismiss(); options.list.dispatchEvent(new CustomEvent('reading-bookmark', { detail: message })); }));
-      dialog.append(button('引用', () => { quote = structuredClone(message); paintQuote(); dismiss(); options.input.focus(); }),
-        button('复制', () => copyMessages([message])), button('转发', () => transfer([message])),
-        button('多选', () => { selecting = true; selected.set(message.id, message); paintSelection(); dismiss(); }));
+      dialog.append(button('引用', () => { if (!valid(message)) { dismiss(); return; } quote = structuredClone(message); paintQuote(); dismiss(); options.input.focus(); }));
+      if (record(message)) {
+        const openRecord = block.querySelector('.chat-record-card');
+        if (openRecord) dialog.append(button('打开聊天记录', () => { dismiss(); if (valid(message)) { suppress = false; openRecord.click(); } }));
+        dialog.append(button('复制标题', async () => {
+          if (!valid(message)) return;
+          try { await root.ElonSocialMessageTransfer.copy([{ content: record(message).title }], context([message])); if (valid(message)) { report('已复制标题'); dismiss(); } }
+          catch (error) { if (valid(message)) status.textContent = error.message || '复制失败，请重试'; }
+        }));
+        const unavailable = button('转发', () => {}); unavailable.disabled = true; unavailable.title = '暂不支持跨群转发聊天记录'; dialog.append(unavailable);
+      } else dialog.append(button('复制', () => copyMessages([message])), button('转发', () => transfer([message])));
+      dialog.append(button('多选', () => { if (valid(message)) { selecting = true; selected.set(message.id, message); paintSelection(); } dismiss(); }));
       block.querySelectorAll('.chat-message-content > .bubble > .group-revision-actions button').forEach(action => {
         const label = action.textContent.startsWith('已编辑') ? '查看修改记录' : action.textContent;
         dialog.append(button(label, () => { dismiss(); action.click(); }));
@@ -68,7 +79,7 @@
         if (action.textContent === '识别二维码') dialog.append(button('识别二维码', () => { dismiss(); action.hidden = false; action.click(); }));
       });
       dialog.append(status, button('关闭', dismiss));
-      dialog.onclose = () => { dialog.remove(); if (menu === dialog) menu = null; if (block.isConnected && document.activeElement !== options.input && !document.querySelector('dialog[open]')) block.querySelector('.social-message-more')?.focus({ preventScroll: true }); };
+      dialog.onclose = () => { dialog.remove(); if (menu === dialog) { menu = null; menuSource = null; } if (block.isConnected && document.activeElement !== options.input && !document.querySelector('dialog[open]')) block.querySelector('.social-message-more')?.focus({ preventScroll: true }); };
       document.body.append(dialog); dialog.showModal();
     }
     function bind(block, message) {
@@ -82,19 +93,20 @@
       if (edited) { edited.title = '可在消息操作中查看修改记录'; block.querySelector('.chat-sender-name')?.append(edited); }
       let timer, start;
       const cancelHold = () => { clearTimeout(timer); start = null; };
-      const open = event => { if (event.target.closest('input,textarea') || !valid(message)) return; event.preventDefault(); event.stopPropagation(); cancelHold(); suppress = Date.now() + 700; show(message, block); };
+      const open = event => { if (event.target.closest('input,textarea') || !valid(message)) return; event.preventDefault(); event.stopPropagation(); cancelHold(); suppress = true; show(message, block); };
       const events = {
         contextmenu: open,
         keydown: event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) open(event); },
         pointerdown: event => {
+          suppress = false;
           if (selecting || event.pointerType === 'mouse' || event.target.closest('input,textarea,a,audio,video,.social-message-more')) return;
-          cancelHold(); start = [event.clientX, event.clientY]; timer = setTimeout(() => { suppress = Date.now() + 800; show(message, block); }, 550);
+          cancelHold(); start = [event.clientX, event.clientY]; timer = setTimeout(() => { suppress = true; show(message, block); }, 550);
         },
         pointermove: event => { if (start && Math.hypot(event.clientX - start[0], event.clientY - start[1]) > 8) cancelHold(); },
         pointerup: cancelHold, pointercancel: cancelHold,
         click: event => {
           if (event.target === check || event.target === more) return;
-          if (selecting || Date.now() < suppress) { event.preventDefault(); event.stopImmediatePropagation(); if (selecting) toggle(message); }
+          if (selecting || suppress) { event.preventDefault(); event.stopImmediatePropagation(); suppress = false; if (selecting) toggle(message); }
         },
       };
       Object.entries(events).forEach(([name, fn]) => block.addEventListener(name, fn, true));
@@ -106,7 +118,7 @@
       if (key !== next || owner !== options.owner()) reset();
       key = next; owner = options.owner(); ordered = messages; rows = new Map(messages.map(m => [m.id, m]));
       for (const [id, message] of selected) if (!valid(message)) selected.delete(id);
-      if (menu && menu.open) dismiss(); paintQuote(); paintSelection();
+      if (menuSource && !valid(menuSource)) dismiss(); paintQuote(); paintSelection();
     }
     function sender(kind, contact) {
       const source = quote, scope = key, identity = owner;

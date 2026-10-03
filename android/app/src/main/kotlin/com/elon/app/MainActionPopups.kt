@@ -36,6 +36,7 @@ internal class MainActionPopups(
     private val selectableForeground: () -> Drawable?,
     private val showStoreDialog: () -> Unit,
     private val groupRevisionActions: (ChatMessage) -> List<TopAction> = { emptyList() },
+    private val additionalMessageActions: (ChatMessage) -> List<TopAction> = { emptyList() },
     private val shareAiMessage: ((ChatMessage, () -> Unit) -> Boolean)? = null,
 ) {
     fun showHomeActionPopup(anchor: View, tab: TextView) {
@@ -94,6 +95,7 @@ internal class MainActionPopups(
         val isRecord = contentActions.isRecord
         val hasText = contentActions.hasText
         val actions = mutableListOf<TopAction>()
+        actions.addAll(com.elon.app.chatrecords.ChatRecordMenuActions.actions(activity, message))
         if (!isRecord) actions.addAll(groupRevisionActions(message))
         if (contentActions.canCopy) {
             actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessage(message, text) })
@@ -133,6 +135,7 @@ internal class MainActionPopups(
                 .setItems(images.mapIndexed { index, item -> item.displayName ?: "图片 ${index + 1}" }.toTypedArray()) { _, index -> recognize(index) }
                 .setNegativeButton("取消", null).show()
         })
+        actions.addAll(additionalMessageActions(message))
         setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
     }
 

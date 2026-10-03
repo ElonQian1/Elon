@@ -180,7 +180,9 @@ internal class MainActionPopupRenderer(
         }
         val arrowHeight = dp(8)
         val cellHeight = dp(MESSAGE_POPUP_CELL_HEIGHT_DP)
-        val panelHeight = verticalPadding * 2 + cellHeight * rowCount
+        val visible = android.graphics.Rect().also(anchor::getWindowVisibleDisplayFrame)
+        val availableHeight = visible.height().takeIf { it > 0 } ?: activity.resources.displayMetrics.heightPixels
+        val panelHeight = minOf(verticalPadding * 2 + cellHeight * rowCount, (availableHeight - dp(32) - arrowHeight).coerceAtLeast(cellHeight))
         val totalHeight = panelHeight + arrowHeight
         val root = FrameLayout(activity).apply {
             layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
@@ -197,7 +199,8 @@ internal class MainActionPopupRenderer(
             }
             setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
         }
-        root.addView(panel, FrameLayout.LayoutParams(
+        val scroll = android.widget.ScrollView(activity).apply { addView(panel); isFillViewport = true }
+        root.addView(scroll, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             panelHeight
         ))
@@ -217,7 +220,8 @@ internal class MainActionPopupRenderer(
         val showAbove = aboveY > dp(76)
         val popupX = (anchorCenterX - popupWidth / 2)
             .coerceIn(dp(12), activity.resources.displayMetrics.widthPixels - popupWidth - dp(12))
-        val popupY = if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8)
+        val popupY = (if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8))
+            .coerceIn(visible.top + dp(8), (visible.top + availableHeight - totalHeight - dp(8)).coerceAtLeast(visible.top + dp(8)))
         val arrowX = (anchorCenterX - popupX - dp(9)).coerceIn(dp(18), popupWidth - dp(36))
 
         root.addView(
@@ -228,7 +232,7 @@ internal class MainActionPopupRenderer(
             }
         )
         if (!showAbove) {
-            (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
+            (scroll.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
         }
 
         popup = PopupWindow(root, popupWidth, totalHeight, true).apply {

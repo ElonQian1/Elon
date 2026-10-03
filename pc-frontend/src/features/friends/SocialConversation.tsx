@@ -133,7 +133,9 @@ export default function SocialConversation(props: Props) {
           <div className={styles.avatar}><SocialAvatar userId={m.sender_user_id} name={name} avatar={avatar} /></div>
           <div className={styles.msgBody} data-social-content>
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
-            {content && (gridCard(content) && conversation.kind === 'group' && !recalled ? <GridShareMessage key={m.id} content={content} group={conversation.id} owner={me.id} title={title} onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })} onAnalyze={() => setAiSelection([m])} onSent={props.onSent} /> : recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id} onAnalyze={!selectionMode && !recalled && !isPending(m) ? () => setAiSelection([m]) : undefined} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} data-reading-bubble className={styles.msgContent} hidden={compactLink}>
+            {content && (gridCard(content) && conversation.kind === 'group' && !recalled ? <GridShareMessage key={m.id} content={content} group={conversation.id} owner={me.id} title={title} onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })} onAnalyze={() => setAiSelection([m])} onSent={props.onSent} /> : recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id}
+              onLongPress={!selectionMode && !recalled && !isPending(m) ? (target, x, y) => setMenu(messageMenuRequest(m.id, target, x, y, target)) : undefined}
+              onAnalyze={!selectionMode && !recalled && !isPending(m) ? () => setAiSelection([m]) : undefined} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} data-reading-bubble className={styles.msgContent} hidden={compactLink}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
               {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="footer" />}
             </div>)}
@@ -164,7 +166,11 @@ export default function SocialConversation(props: Props) {
     {newMessages && <button type="button" className={tools.latest} onClick={latest}>有新消息 · 回到最新</button>}
     <SocialComposer conversation={conversation} title={title} me={me} input={input} setInput={setInput} setMessages={setMessages} onSent={() => { latest(); props.onSent() }} quote={quote} />
     {forward && <SocialForwardDialog messages={forward} targets={props.targets} onClose={() => setForward(null)} onSent={props.retry} />}
-    {quoteDetail && <SocialDialog title="引用的消息" onClose={() => setQuoteDetail(null)}><p>{quoteDetail.sender_name}</p><MarkdownContent content={quoteDetail.unavailable ? '原消息已撤回或不可用' : quoteDetail.content} copy={false} />{!quoteDetail.unavailable && <SocialMessageAttachments attachments={quoteDetail.attachments} />}</SocialDialog>}
+    {quoteDetail && <SocialDialog title="引用的消息" onClose={() => setQuoteDetail(null)}><p>{quoteDetail.sender_name}</p>
+      {!quoteDetail.unavailable && recordCard(quoteDetail.content) && conversation.kind === 'group'
+        ? <ChatRecordMessage content={quoteDetail.content} group={conversation.id} />
+        : <MarkdownContent content={quoteDetail.unavailable ? '原消息已撤回或不可用' : quoteDetail.content} copy={false} />}
+      {!quoteDetail.unavailable && <SocialMessageAttachments attachments={quoteDetail.attachments} />}</SocialDialog>}
     {aiSelection && conversation.kind === 'group' && <GroupAiSelectionDialog key={key} owner={me.id} group={conversation.id} title={title} messages={aiSelection} onClose={() => setAiSelection(null)} />}
   </div>
 }

@@ -89,7 +89,7 @@ internal class MessageTimelineNavigation(private val list: RecyclerView, content
         } else { reading.capture(); saved = null; state.latest() }
         buttons(); refresh?.invoke(direction == "latest")
     }
-    fun messageActions(anchor: View, message: ChatMessage, fallback: (View, ChatMessage) -> Unit) = reading.messageActions(anchor, message, fallback)
+    fun messageActions(message: ChatMessage): List<TopAction> = reading.messageActions(message)
     fun prepareLatest() { reading.capture(); loading = "latest"; key?.let { reader.timeline(it)?.latest() } }
     fun close() { reading.close(); strip.visibility = View.GONE; saved = null; key = null; refresh = null; messages = emptyList(); waiting = null; loading = null; edge.enabled = false }
 }

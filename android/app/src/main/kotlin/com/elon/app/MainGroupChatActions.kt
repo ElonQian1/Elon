@@ -40,6 +40,7 @@ internal class MainGroupChatActions(
     private var owner = AuthManager.userId(activity)
     private val quotes = com.elon.app.socialquotes.SocialQuoteComposer(binding)
     fun quoteMessage(message: ChatMessage): Boolean = isActive() && quotes.select(message)
+    fun readingActions(message: ChatMessage): List<TopAction> = if (isActive()) timelineNavigation.messageActions(message) else emptyList()
     private val messagesByGroup = linkedMapOf<String, MutableList<ChatMessage>>()
     private val readPositions = linkedMapOf<String, android.os.Parcelable>()
     private var pendingReadPosition: android.os.Parcelable? = null
@@ -100,7 +101,7 @@ internal class MainGroupChatActions(
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
-            onMessageLongPress = { view, message -> timelineNavigation.messageActions(view, message, showMessageActions) },
+            onMessageLongPress = showMessageActions,
             onProjectShareAction = onProjectShareAction,
             onProjectShareLongPress = onProjectShareLongPress
         )

@@ -8,6 +8,7 @@ import { messageText, socialRequest } from './socialChatOperations'
 import SocialDialog from './SocialDialog'
 import GroupAssistantDialog from './group-assistant/GroupAssistantDialog'
 import { recordCard } from './chat-records/recordApi'
+import ChatRecordMessage from './chat-records/ChatRecordMessage'
 import styles from './SocialTools.module.css'
 
 interface Summary { id: string; title: string; summary?: string; pinned_at?: string | null; status?: string }
@@ -78,13 +79,14 @@ export default function SocialConversationTools(props: Props) {
     {props.selectionMode && <div className={styles.toolbar} aria-label="多选消息操作"><strong>已选 {selected.length} 条</strong>
       {props.onAiReply && <button type="button" disabled={!selected.length} onClick={props.onAiReply}><Bot size={16} aria-hidden="true" /> AI 分析</button>}
       {!hasRecords && <><button type="button" disabled={!selected.length} onClick={() => void copyTextToClipboard(selected.map(item => messageText(item.message)).join('\n\n')).then(ok => setNotice(ok ? '已复制所选消息' : '复制失败'))}>复制所选</button>
-      <button type="button" disabled={!selected.length} onClick={() => props.onForward(selected)}>转发所选</button><button type="button" disabled={!selected.length} onClick={() => props.onSave(selected)}>收藏所选</button></>}<button type="button" onClick={props.onClearSelection}>退出多选</button>
+      <button type="button" disabled={!selected.length} onClick={() => props.onForward(selected)}>转发所选</button></>}<button type="button" disabled={!selected.length} onClick={() => props.onSave(selected)}>收藏所选</button><button type="button" onClick={props.onClearSelection}>退出多选</button>
     </div>}
     {notice && <p className={styles.hint} role="status">{notice}</p>}
     {panel && <SocialDialog title={panel === 'favorites' ? '本机收藏' : panel === 'search' ? '群历史检索' : '置顶与群聊总结'} onClose={() => { epoch.current++; setBusy(false); setPanel(null) }}>
       {panel === 'favorites' && <><p className={styles.hint}>保存在本机的消息快照，可能与原文当前版本不同；不会跨设备同步，退出登录时清理。</p>
         {!props.favorites.length && <p>还没有收藏的消息</p>}{props.favorites.map(item => <article className={styles.item} key={localMessageKey(item.conversation,item.message.id)}>
-          <strong>{item.title}</strong><time> · {new Date(item.message.created_at).toLocaleString()}</time><pre>{messageText(item.message)}</pre>
+          <strong>{item.title}</strong><time> · {new Date(item.message.created_at).toLocaleString()}</time>
+          {recordCard(item.message.content) ? <ChatRecordMessage content={item.message.content} group={item.conversation.id} /> : <pre>{messageText(item.message)}</pre>}
           <button type="button" onClick={() => props.onRemoveFavorite(localMessageKey(item.conversation,item.message.id))}>取消收藏</button>
         </article>)}</>}
       {panel === 'search' && <><form onSubmit={event => { event.preventDefault(); if (search.trim()) void findMessages() }}>

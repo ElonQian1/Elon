@@ -109,6 +109,27 @@ public final class ChatRecordUiAcceptance extends UiAutomatorTestCase {
             result.put("ready", ready().waitForExists(15000));
             result.put("open_to_accessibility_ready_ms", SystemClock.elapsedRealtime() - started);
             assertTrue("record_reader_not_opened", result.getBoolean("ready"));
+        } else if (step.equals("message_menu")) {
+            assertFalse("record_existing_quote_preserved", desc("取消引用").exists());
+            UiObject input = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/inputEdit"));
+            String draft = input.getText();
+            UiObject card = new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("查看聊天记录 ").instance(0));
+            for (int n = 0; !card.exists() && n < 8; n++) scroll(false);
+            for (int n = 0; !card.exists() && n < 16; n++) scroll(true);
+            assertTrue("record_card_missing", card.exists()); revealForTouch(card);
+            UiObject title = card.getChild(new UiSelector().className("android.widget.TextView").index(0));
+            assertTrue("record_hold_failed", title.longClick());
+            assertTrue("record_quote_menu_missing", text("引用").waitForExists(3000));
+            for (String label : new String[] {"打开记录", "复制标题", "多选", "时间", "AI分析记录"})
+                assertTrue("record_common_menu_missing", text(label).exists());
+            assertFalse("record_intermediate_menu_present", text("其他消息操作").exists());
+            assertFalse("record_hold_opened_reader", ready().exists());
+            result.put("common_menu", true).put("reading_bookmark", text("阅读书签").exists());
+            click(text("引用"));
+            assertTrue("record_quote_draft_missing", desc("取消引用").waitForExists(3000));
+            click(desc("取消引用"));
+            assertEquals("record_composer_changed", draft, input.getText());
+            result.put("quote_cancel", true).put("group_messages_sent", 0);
         } else if (step.equals("cache_menu")) {
             assertTrue("record_reader_required", ready().exists()); click(desc("更多")); click(text("缓存管理"));
             assertTrue("record_cache_dialog_missing", text("清理当前").waitForExists(5000));

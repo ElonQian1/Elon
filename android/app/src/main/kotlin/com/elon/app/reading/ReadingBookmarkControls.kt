@@ -6,7 +6,6 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -64,14 +63,18 @@ internal class ReadingBookmarkControls(private val list: RecyclerView, private v
         markerDestination = id
         store?.putPosition(JSONObject().put("message_id", id).put("fraction", fraction)); userScrolled = false
     }
-    fun messageActions(anchor: View, message: ChatMessage, fallback: (View, ChatMessage) -> Unit) {
-        if (store?.supported != true || message.id.isNullOrBlank()) { fallback(anchor, message); return }
-        PopupMenu(list.context, anchor).apply {
-            menu.add("添加阅读书签").setOnMenuItemClickListener { editor(store?.bookmarks?.find { it.optJSONObject("anchor")?.optString("message_id") == message.id }, message); true }
-            menu.add("将此处设为当前续读位置").setOnMenuItemClickListener { markerDestination = message.id; store?.putPosition(JSONObject().put("message_id", message.id).put("fraction", 0.0)); true }
-            menu.add("其他消息操作").setOnMenuItemClickListener { fallback(anchor, message); true }
-            show()
-        }
+    fun messageActions(message: ChatMessage): List<TopAction> {
+        val current = store ?: return emptyList()
+        if (!current.supported || current.denied || message.id.isNullOrBlank() || message.isRecalled()) return emptyList()
+        fun valid() = store === current && !current.denied && rows().any { it.id == message.id && !it.isRecalled() }
+        return listOf(
+            TopAction("阅读书签", R.drawable.ic_msg_favorite) {
+                if (valid()) editor(current.bookmarks.find { it.optJSONObject("anchor")?.optString("message_id") == message.id }, message)
+            },
+            TopAction("从此续读", R.drawable.ic_msg_time) {
+                if (valid()) { markerDestination = message.id; current.putPosition(JSONObject().put("message_id", message.id).put("fraction", 0.0)) }
+            }
+        )
     }
     private fun builder(title: String) = MaterialAlertDialogBuilder(list.context).setTitle(title).setNegativeButton("关闭", null)
     private fun display(builder: MaterialAlertDialogBuilder) { dialog?.dismiss(); dialog = builder.show() }
