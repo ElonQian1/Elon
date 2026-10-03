@@ -6,7 +6,7 @@ const { pathToFileURL } = require('node:url')
 const root = path.resolve(__dirname, '..')
 const output = path.resolve(root, '../.ai-tmp/social-image-thumbnails')
 const engine = process.env.BROWSER_ENGINE || 'chromium'
-const sizes = { landscape: [1920, 1200], wide: [2560, 664], portrait: [800, 1200], tall: [1080, 6000], small: [48, 48] }
+const sizes = { landscape: [1920, 1200], wide: [2560, 664], portrait: [800, 1200], tall: [1080, 6000], ultra: [1080, 50000], small: [16, 16] }
 
 async function main() {
   fs.mkdirSync(output, { recursive: true })
@@ -56,13 +56,14 @@ async function main() {
       const rows = await page.locator('[data-case]').evaluateAll(nodes => nodes.map(row => {
         const button = row.querySelector('[data-preview-image]'), image = button.querySelector('img')
         const b = button.getBoundingClientRect(), i = image.getBoundingClientRect(), p = row.querySelector('[data-body]').getBoundingClientRect()
-        return { name: row.dataset.case, button: b.toJSON(), image: i.toJSON(), parent: p.toJSON(), ratio: image.naturalWidth / image.naturalHeight }
+        return { name: row.dataset.case, button: b.toJSON(), image: i.toJSON(), parent: p.toJSON(), background: getComputedStyle(button).backgroundColor, ratio: image.naturalWidth / image.naturalHeight }
       }))
       await page.screenshot({ path: path.join(output, `${engine}-${width}-${zoom}.png`) })
       for (const row of rows) {
         measurements.push({ width, zoom, name: row.name, buttonWidth: row.button.width, imageWidth: row.image.width })
-        assert(Math.abs(row.button.width - row.image.width) <= 1 && Math.abs(row.button.height - row.image.height) <= 1,
+        assert(Math.abs(row.button.width - Math.max(row.image.width, 44 * zoom)) <= 1 && Math.abs(row.button.height - Math.max(row.image.height, 44 * zoom)) <= 1,
           `thumbnail has empty wrapper space: ${JSON.stringify(measurements.at(-1))}`)
+        assert.equal(row.background, 'rgba(0, 0, 0, 0)', `opaque image wrapper: ${row.name}`)
         assert(Math.abs(row.image.width / row.image.height - row.ratio) < 0.03, `distorted image: ${row.name}`)
         assert(row.image.width <= 320 * zoom + 1 && row.image.height <= 300 * zoom + 1)
         assert(row.button.x >= row.parent.x - 1 && row.button.right <= row.parent.right + 1, `parent overflow: ${row.name}`)
