@@ -18,6 +18,10 @@ internal fun showProjectSpaceResources(activity: AppCompatActivity, space: Proje
         .setItems(links.map { it.label }.toTypedArray()) { _, index ->
             val value = links[index].url
             val url = if (value.startsWith("/")) serverUrl.trimEnd('/') + value else value
+            if (value == space?.introduction?.webUrl) {
+                com.elon.app.sharing.ArticleLinkActivity.open(activity, url)
+                return@setItems
+            }
             runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure {
                 android.widget.Toast.makeText(activity, "无法打开链接，请检查浏览器是否可用。", android.widget.Toast.LENGTH_SHORT).show()
             }

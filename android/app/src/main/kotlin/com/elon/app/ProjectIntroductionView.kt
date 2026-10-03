@@ -17,7 +17,8 @@ internal data class ProjectIntroductionContent(
     val requirements: List<String>,
     val privacy: List<String>,
     val description: String? = null,
-    val resources: List<ProjectIntroductionLink> = emptyList()
+    val resources: List<ProjectIntroductionLink> = emptyList(),
+    val webUrl: String? = null
 )
 
 internal data class ProjectIntroductionLink(val label: String, val url: String)
@@ -51,7 +52,8 @@ internal fun parseProjectIntroduction(landing: JSONObject?): ProjectIntroduction
     }
     return ProjectIntroductionContent(text("tagline"), text("summary") ?: text("description"),
         items("highlights"), items("target_users"), items("recent_updates"),
-        items("system_requirements"), items("privacy_notes"), text("description"), links)
+        items("system_requirements"), items("privacy_notes"), text("description"), links,
+        com.elon.app.sharing.SourceLink.webUrl(text("web_url"))?.takeIf { it.startsWith("https://", true) })
 }
 
 internal class ProjectIntroductionView(
@@ -68,6 +70,9 @@ internal class ProjectIntroductionView(
         setBackgroundColor(colors.surface)
         setPadding(dp(24), dp(20), dp(24), dp(20))
         val content = space.introduction
+        content?.webUrl?.let { url ->
+            addView(action("打开网页端") { com.elon.app.sharing.ArticleLinkActivity.open(activity, url) })
+        }
         addView(label("团队协作", heading = true))
         val joining = when (space.project.joinMode) {
             PROJECT_JOIN_MODE_OPEN -> "加入同一个项目，按角色权限共同参与。"
