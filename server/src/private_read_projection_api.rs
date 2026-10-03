@@ -12,8 +12,12 @@ use axum::{
 use serde_json::json;
 use std::sync::Arc;
 
+#[path = "grid_device_sources/mod.rs"]
+mod grid_device_sources;
+
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(grid_device_sources::routes())
         .route("/api/node/private-read-projections", post(upload))
         .layer(DefaultBodyLimit::max(contract::MAX_BYTES))
         .layer(middleware::from_fn(
