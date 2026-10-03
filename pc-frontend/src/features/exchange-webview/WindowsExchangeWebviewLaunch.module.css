@@ -30,6 +30,8 @@
 .content span { color: var(--text-soft); font-size: 12px; line-height: 1.55; }
 .content small { color: var(--text-muted); font-size: 10px; line-height: 1.5; }
 
+.sources { grid-column: 1 / -1; min-width: 0; padding-top: 12px; border-top: 1px solid var(--border); }
+
 .card button {
   min-width: 152px;
   height: 36px;

@@ -70,13 +70,15 @@ export default function WindowsExchangeWebviewLaunch({
         {message && <p className={styles.success} role="status">{message}</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         {observing && identity.ownerKey && <ExchangeObservationSummary providerId={launch.provider_id} ownerKey={identity.ownerKey} />}
-        {desktop && launch.provider_id === 'binance' && identity.source === 'cloud_account' &&
-          <GridDeviceSourcesPanel key={identity.ownerKey} ownerKey={identity.ownerKey} />}
       </div>
       <button type="button" disabled={disabled} onClick={() => void open()}>
         {opening ? <Loader2 className={styles.spinner} size={15} aria-hidden="true" /> : <ExternalLink size={15} aria-hidden="true" />}
         {opening ? '正在打开…' : launch.label || '打开官网 WebView'}
       </button>
+      {desktop && launch.provider_id === 'binance' && identity.source === 'cloud_account' &&
+        <div className={styles.sources}>
+          <GridDeviceSourcesPanel key={identity.ownerKey} ownerKey={identity.ownerKey} />
+        </div>}
     </section>
   )
 }
