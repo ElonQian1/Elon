@@ -203,8 +203,10 @@ pub async fn open_internal_browser_tab(
 }
 
 fn present(tab: &Webview, bounds: EmbeddedWebviewBounds) -> Result<(), String> {
-    tab.set_position(bounds.position()).map_err(display_error)?;
-    tab.set_size(bounds.size()).map_err(display_error)?;
+    if tab.window().label() != MAIN_WINDOW_LABEL {
+        return Ok(());
+    }
+    crate::webview_layout::place(tab, bounds.position(), bounds.size())?;
     tab.show().map_err(display_error)?;
     raise_webview(tab)?;
     tab.set_focus().map_err(display_error)
@@ -229,8 +231,10 @@ pub fn resize_internal_browser_tab(
     let tab = app
         .get_webview(&webview_label(&tab_id))
         .ok_or_else(|| "内部网页标签尚未打开。".to_string())?;
-    tab.set_position(bounds.position()).map_err(display_error)?;
-    tab.set_size(bounds.size()).map_err(display_error)
+    if tab.window().label() != MAIN_WINDOW_LABEL {
+        return Ok(());
+    }
+    crate::webview_layout::place(&tab, bounds.position(), bounds.size())
 }
 
 #[tauri::command]

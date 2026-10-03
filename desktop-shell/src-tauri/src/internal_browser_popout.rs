@@ -1,5 +1,5 @@
 //! Moving a reading tab between the workbench window and its own top-level window.
-use tauri::{AppHandle, Manager, PhysicalPosition, Webview, WindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, Webview, WindowBuilder, WindowEvent};
 
 use super::{
     display_error, raise_webview, tab_id_from_label, InternalBrowserRuntime, MAIN_WINDOW_LABEL,
@@ -42,11 +42,13 @@ pub(super) fn detach(app: &AppHandle, tab: &Webview, title: &str) -> Result<(), 
                         }
                     }
                 }
-                WindowEvent::Resized(size) => {
+                WindowEvent::Resized(size)
+                | WindowEvent::ScaleFactorChanged {
+                    new_inner_size: size,
+                    ..
+                } => {
                     if let Some(view) = handle.get_webview(&owned) {
-                        if view.window().label() == own_label {
-                            let _ = view.set_size(*size);
-                        }
+                        let _ = crate::webview_layout::resize_hosted(&view, &own_label, *size);
                     }
                 }
                 _ => {}
@@ -58,10 +60,7 @@ pub(super) fn detach(app: &AppHandle, tab: &Webview, title: &str) -> Result<(), 
     if tab.window().label() != label {
         tab.reparent(&window).map_err(display_error)?;
     }
-    tab.set_position(PhysicalPosition::new(0, 0))
-        .map_err(display_error)?;
-    tab.set_size(window.inner_size().map_err(display_error)?)
-        .map_err(display_error)?;
+    crate::webview_layout::fill_host(tab, &window)?;
     tab.show().map_err(display_error)?;
     window
         .set_title(&format!("{title} · 一龙阅读"))

@@ -219,8 +219,7 @@ pub(super) async fn open(
         };
         if let Some(size) = resized {
             if let Some(page) = destroyed_app.get_webview(&window_state_label) {
-                let _ = page.set_position(PhysicalPosition::new(0, 0));
-                let _ = page.set_size(size);
+                let _ = crate::webview_layout::resize_hosted(&page, &window_state_label, size);
             }
         } else if matches!(event, WindowEvent::Destroyed)
             && destroyed_app.get_webview(&window_state_label).is_none()

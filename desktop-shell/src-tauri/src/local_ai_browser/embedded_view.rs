@@ -1,13 +1,11 @@
 use serde::Deserialize;
-use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Url, Webview,
-};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview};
 
 use crate::{internal_browser::raise_webview, MAIN_WINDOW_LABEL};
 
 use super::{
-    ensure_runtime_session, ensure_session_webview, provider, resolve_owner_fingerprint,
-    reconnect_adapter, window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
+    ensure_runtime_session, ensure_session_webview, provider, reconnect_adapter,
+    resolve_owner_fingerprint, window_label, LocalAiBrowserRuntime, LocalAiWebSessionState,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -99,9 +97,7 @@ pub(crate) async fn hide_local_ai_web_session_embedded(
 pub(crate) fn park(webview: &Webview) -> Result<(), String> {
     let (parked_x, parked_y) = parked_position();
     webview.hide().map_err(display_error)?;
-    webview
-        .set_position(PhysicalPosition::new(parked_x, parked_y))
-        .map_err(display_error)?;
+    crate::webview_layout::park(webview, parked_x, parked_y)?;
     webview.show().map_err(display_error)
 }
 
@@ -144,10 +140,7 @@ pub(crate) fn present(
     if let Some(popout) = app.get_window(webview_label) {
         popout.hide().map_err(display_error)?;
     }
-    webview
-        .set_position(bounds.position())
-        .map_err(display_error)?;
-    webview.set_size(bounds.size()).map_err(display_error)?;
+    crate::webview_layout::place(&webview, bounds.position(), bounds.size())?;
     webview.show().map_err(display_error)?;
     raise_webview(&webview)?;
     webview.set_focus().map_err(display_error)
@@ -167,12 +160,7 @@ pub(crate) fn hide(app: &AppHandle, webview_label: &str) -> Result<(), String> {
             // provider DOM and background controller without another reparent.
             popout.hide().map_err(display_error)?;
             webview.hide().map_err(display_error)?;
-            webview
-                .set_position(PhysicalPosition::new(0, 0))
-                .map_err(display_error)?;
-            webview
-                .set_size(popout.inner_size().map_err(display_error)?)
-                .map_err(display_error)?;
+            crate::webview_layout::fill_host(&webview, &popout)?;
             webview.show().map_err(display_error)?;
         } else {
             park(&webview)?;
@@ -223,12 +211,7 @@ pub(crate) fn restore_popout(app: &AppHandle, webview_label: &str) -> Result<(),
     if webview.window().label() != webview_label {
         webview.reparent(&popout).map_err(display_error)?;
     }
-    webview
-        .set_position(PhysicalPosition::new(0, 0))
-        .map_err(display_error)?;
-    webview
-        .set_size(popout.inner_size().map_err(display_error)?)
-        .map_err(display_error)?;
+    crate::webview_layout::fill_host(&webview, &popout)?;
     webview.show().map_err(display_error)?;
     popout.unminimize().map_err(display_error)?;
     popout.show().map_err(display_error)?;

@@ -27,7 +27,6 @@ mod conversation_scripts;
 pub(crate) mod embedded_view;
 #[path = "local_ai_browser/exchange_observation.rs"]
 pub(crate) mod exchange_observation;
-pub(crate) mod grid_device_transport;
 #[path = "local_ai_browser/exchange_webview.rs"]
 pub(crate) mod exchange_webview;
 #[path = "local_ai_browser/google_ai_mode.rs"]
@@ -36,6 +35,7 @@ mod google_ai_mode;
 mod google_ai_mode_adapter_bootstrap;
 #[path = "local_ai_browser/google_url_policy.rs"]
 mod google_url_policy;
+pub(crate) mod grid_device_transport;
 #[path = "local_ai_browser/group_session.rs"]
 pub(crate) mod group_session;
 #[path = "local_ai_browser/group_text_bootstrap.rs"]
@@ -80,8 +80,8 @@ use std::{fs, process::Command};
 
 use tauri::{
     webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder},
-    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Url, Webview,
-    WebviewUrl, Window, WindowBuilder, WindowEvent,
+    AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewUrl, Window,
+    WindowBuilder, WindowEvent,
 };
 
 pub use guest_identity::LocalAiGuestOwnerIdentity;

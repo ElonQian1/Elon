@@ -106,7 +106,8 @@ const controlOfficialWebview = rust.slice(
   rust.indexOf('pub async fn run_local_ai_web_adapter_command'),
 )
 
-assert.match(rust, /\.data_directory\(profile_directory\)/)
+assert.match(rust, /crate::browser_profile::persistent\(/)
+assert.match(rust, /&profile_directory/)
 assert.match(rust, /owner_fingerprint/)
 assert.match(ownerProfileRust, /Sha256::digest\(owner_key\.as_bytes\(\)\)/)
 assert.match(ownerProfileRust, /migrate_provider/)
@@ -159,7 +160,7 @@ assert.match(
 assert.match(embeddedViewRust, /webview\.hide\(\)/)
 assert.match(embeddedViewRust, /webview\.reparent\(/)
 assert.match(parkOfficialWebview, /webview\.hide\(\)/)
-assert.match(parkOfficialWebview, /PhysicalPosition::new\(parked_x, parked_y\)/)
+assert.match(parkOfficialWebview, /webview_layout::park\(webview, parked_x, parked_y\)/)
 assert.doesNotMatch(parkOfficialWebview, /\.set_size\(/)
 assert.match(parkOfficialWebview, /webview\.show\(\)/)
 assert.doesNotMatch(parkOfficialWebview, /-DEFAULT_VIEWPORT_(?:WIDTH|HEIGHT)/)

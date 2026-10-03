@@ -34,6 +34,7 @@ mod group_ai_worker;
 mod internal_browser;
 mod local_ai_browser;
 mod social_media_preview;
+mod webview_layout;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
