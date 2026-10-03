@@ -104,6 +104,8 @@
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />
         <activity android:name=".grid.host.BinanceAccountActivity" android:exported="false" />
+        <activity android:name=".grid.sources.GridDeviceSourcesActivity" android:exported="false"
+            android:excludeFromRecents="true" android:allowTaskReparenting="false" />
         <activity android:name=".grid.host.BinanceHostConnectActivity"
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />

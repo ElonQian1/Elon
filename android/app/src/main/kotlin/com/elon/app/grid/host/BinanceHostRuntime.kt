@@ -71,7 +71,10 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         if(captured!=null){deadline=SystemClock.elapsedRealtime()+900_000;armExpiry()}
         events.changed("state")
     }
-    private fun notifyChanged(){onChanged?.invoke();events.changed("state");events.changed("read")}
+    private fun notifyChanged(){
+        onChanged?.invoke();events.changed("state");events.changed("read")
+        runCatching { com.elon.app.grid.sources.GridDeviceSync.get(context).changed(this) }
+    }
     fun referenceObserved(raw:String) {
         val data=runCatching {StrictJson.parse(raw,512)}.getOrNull() ?: return
         if(data.keys!=setOf("token","request") || document.accept(data["token"] as? String ?: "")==null || !live())return

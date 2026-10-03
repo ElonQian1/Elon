@@ -33,6 +33,9 @@ class BinanceAccountActivity : com.elon.app.MobileActivity() {
         status = ui.label("正在确认账户…", 13f).apply { contentDescription = "binance-account-status" }
         root.addView(status)
         root.addView(ui.label("本机账户供一龙量化 APK 使用。切换后，请回量化重新连接并确认授权。", 13f))
+        root.addView(ui.button("多端网格 · APK / Win", "多端网格，可同时选择 APK 和 Win") {
+            startActivity(android.content.Intent(this, com.elon.app.grid.sources.GridDeviceSourcesActivity::class.java))
+        })
         root.addView(ui.button("切换币安账户", "binance-account-switch") {
             AlertDialog.Builder(this).setTitle("切换币安账户")
                 .setMessage("将撤销量化的网格与资产读取授权。请在官网退出当前账户并登录另一账户，再点击核对账户。")

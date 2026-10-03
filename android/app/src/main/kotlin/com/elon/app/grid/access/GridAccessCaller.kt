@@ -10,7 +10,8 @@ import com.elon.app.readInstalledPackageInfo
 internal fun Activity.hasOfficialGridAccessCaller(): Boolean = runCatching {
     val caller = callingActivity ?: return false
     if (packageName != "com.elon.app" || callingPackage != "com.elon.quant" || caller.packageName != callingPackage ||
-        caller.className != "com.elon.quant.grids.access.GridAccessActivity") return false
+        caller.className !in setOf("com.elon.quant.grids.access.GridAccessActivity",
+            "com.elon.quant.grids.sources.GridSourcesActivity")) return false
     val installed = readInstalledPackageInfo(packageManager, caller.packageName) ?: return false
     @Suppress("DEPRECATION")
     val activity = packageManager.getActivityInfo(caller, PackageManager.MATCH_DISABLED_COMPONENTS)
