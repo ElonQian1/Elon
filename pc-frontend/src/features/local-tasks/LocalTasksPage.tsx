@@ -69,6 +69,7 @@ export default function LocalTasksPage() {
   const [error, setError] = useState('')
   const [detailError, setDetailError] = useState('')
   const [notice, setNotice] = useState('')
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const [evolution, setEvolution] = useState<SelfEvolutionQueue>(EMPTY_EVOLUTION)
   const [publish, setPublish] = useState<GlobalPublishStatus>(EMPTY_PUBLISH)
   const [visibleTaskCount, setVisibleTaskCount] = useState(INITIAL_VISIBLE_TASKS)
@@ -112,10 +113,11 @@ export default function LocalTasksPage() {
   }, [refreshList])
 
   useEffect(() => {
+    if (!diagnosticsOpen) return
     void refreshOperations()
     const timer = window.setInterval(() => void refreshOperations(), LIST_POLL_MS)
     return () => window.clearInterval(timer)
-  }, [refreshOperations])
+  }, [diagnosticsOpen, refreshOperations])
 
   useEffect(() => {
     if (!selectedId) {
@@ -339,12 +341,15 @@ export default function LocalTasksPage() {
       )}
       {notice && <div className={styles.successNotice}>{notice}</div>}
 
-      <LocalOperationsPanel
-        evolution={evolution}
-        publish={publish}
-        actionKey={actionKey}
-        onAction={handleEvolutionAction}
-      />
+      <details className={styles.diagnostics} onToggle={(event) => setDiagnosticsOpen(event.currentTarget.open)}>
+        <summary>高级诊断<span>后台调度与发布状态</span></summary>
+        {diagnosticsOpen && <LocalOperationsPanel
+          evolution={evolution}
+          publish={publish}
+          actionKey={actionKey}
+          onAction={handleEvolutionAction}
+        />}
+      </details>
 
       <div className={styles.workspace}>
         <aside className={styles.sidebar}>

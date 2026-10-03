@@ -68,11 +68,15 @@ export function rememberLocalNodeBaseUrl(raw: string): string {
   return safe
 }
 
-export function isLocalWorkbench(): boolean {
+/** Asset hosting only: this must never select the user's home page or navigation. */
+export function isLocallyHostedWorkbench(): boolean {
   const boot = bootstrap()
   if (boot.mode === 'local') return true
   return isLoopbackHost(location.hostname) && location.port === '7799'
 }
+
+/** Compatibility name for existing API, cache and node discovery callers. */
+export const isLocalWorkbench = isLocallyHostedWorkbench
 
 export function cloudBaseUrl(): string {
   const base = bootstrap().cloudBaseUrl?.trim() || DEFAULT_CLOUD_BASE_URL

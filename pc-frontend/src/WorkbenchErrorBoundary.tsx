@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { workbenchHomeHref } from './features/shell/workbenchEntry'
 import styles from './WorkbenchErrorBoundary.module.css'
 
 interface WorkbenchErrorBoundaryProps {
@@ -30,10 +31,10 @@ export default class WorkbenchErrorBoundary extends Component<
         <section className={styles.card}>
           <span className={styles.status}>一龙工作台仍在运行</span>
           <h1>这个页面加载失败了</h1>
-          <p>已阻止整窗黑屏。你可以立即重试当前页面，或先返回本机任务页。</p>
+          <p>已阻止整窗黑屏。你可以重试当前页面，或返回 AI 工作台。</p>
           <div className={styles.actions}>
             <button type="button" onClick={() => window.location.reload()}>重试当前页面</button>
-            <button type="button" onClick={returnToSafeHome}>返回本机任务</button>
+            <button type="button" onClick={returnToSafeHome}>返回 AI 工作台</button>
           </div>
         </section>
       </main>
@@ -42,5 +43,5 @@ export default class WorkbenchErrorBoundary extends Component<
 }
 
 function returnToSafeHome() {
-  window.location.assign(window.location.pathname.startsWith('/pc') ? '/pc/local-tasks' : '/')
+  window.location.assign(workbenchHomeHref(window.location.pathname, window.location.search))
 }

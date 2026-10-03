@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
 import DesktopTitleBar from './DesktopTitleBar'
@@ -13,7 +13,8 @@ import { useAuthStore } from '../../store/auth'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import LocalModeBanner from './LocalModeBanner'
 import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
-import { isLocalWorkbench } from '../../api/runtime'
+import { isLocallyHostedWorkbench } from '../../api/runtime'
+import { useWorkbenchConnection, useWorkbenchConnectionMonitor } from './useWorkbenchConnection'
 import styles from './Shell.module.css'
 import { useCodexControlBridge } from '../codex-control/useCodexControlBridge'
 import { useBrowserResearchBridge } from '../browser-research/useBrowserResearchBridge'
@@ -22,11 +23,10 @@ const AuthDialog = lazy(() => import('../auth/AuthDialog'))
 
 function NodeConnectBanner() {
   const { status, errorMessage, detailMessage } = useNodeAutoConnect()
-  if (status === 'idle') return null
+  if (status === 'idle' || status === 'success') return null
   const bannerClass = [
     styles.nodeBanner,
     status === 'connecting' ? styles.nodeBannerConnecting : '',
-    status === 'success' ? styles.nodeBannerSuccess : '',
     status === 'offline' ? styles.nodeBannerOffline : '',
     status === 'error' ? styles.nodeBannerError : '',
   ].filter(Boolean).join(' ')
@@ -36,22 +36,18 @@ function NodeConnectBanner() {
       <span>{detailMessage || '检测到本机节点，正在自动绑定到你的账号…'}</span>
     </div>
   )
-  if (status === 'success') return (
-    <div className={bannerClass}>
-      <CircleCheck className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
-      <span>{detailMessage || '本机节点已绑定到你的账号，可在 AI 对话页直接操控这台电脑。'}</span>
-    </div>
-  )
   if (status === 'offline') return (
     <div className={bannerClass}>
       <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
       <span>{detailMessage || '本机 Win 端当前不可达；启动后会自动重新绑定。'}</span>
+      <Link to="/node">连接与设备</Link>
     </div>
   )
   if (status === 'error') return (
     <div className={bannerClass}>
       <TriangleAlert className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
       <span>节点绑定失败：{errorMessage}</span>
+      <Link to="/node">查看并重试</Link>
     </div>
   )
   return null
@@ -66,7 +62,8 @@ function AccountClaimBanner() {
   return (
     <>
       <div className={styles.claimBanner}>
-        <span>注册账号后同步项目、好友和电脑节点。</span>
+        <span>登录一龙账号以同步项目和消息，也可继续使用可用的访客聊天。</span>
+        <Link to="/login">登录</Link>
         <button type="button" onClick={() => setRegisterDialogOpen(true)}>
           注册账号
         </button>
@@ -103,22 +100,28 @@ export default function Shell() {
   useCodexControlBridge()
   useBrowserResearchBridge()
   const duplicateTab = useWorkbenchTabCoordinator()
-  const localMode = isLocalWorkbench()
-  useNotifications(!localMode)
+  const locallyHosted = isLocallyHostedWorkbench()
+  useWorkbenchConnectionMonitor(!duplicateTab)
+  const { cloudState } = useWorkbenchConnection()
+  const cloudAvailable = cloudState !== 'offline'
+  useNotifications(!duplicateTab && cloudAvailable)
   const token = useAuthStore((s) => s.token)
   const fetchMe = useAuthStore((s) => s.fetchMe)
 
   // token 存在时始终刷新用户信息（确保 user.id 格式正确）
   // 不再依赖 !user 判断，因为旧版 localStorage 可能存了格式错误的 user 对象
   useEffect(() => {
-    if (localMode || !token) return
+    if (duplicateTab || cloudState !== 'online' || !token) return
+    let cancelled = false
     fetchMe().catch((err: { status?: number }) => {
-      if (err?.status === 401) {
+      if (!cancelled && err?.status === 401 && useAuthStore.getState().token === token) {
         useAuthStore.getState().logout()
       }
     })
-  }, [fetchMe, localMode, token])
-  useProjectOpenPrewarm(!duplicateTab && !localMode)
+    return () => { cancelled = true }
+  }, [fetchMe, cloudState, duplicateTab, token])
+  // Preserve the existing opt-in cloud-page prewarm; opening local Chat does not start project work.
+  useProjectOpenPrewarm(!duplicateTab && !locallyHosted && cloudAvailable)
 
   if (duplicateTab) return <DuplicateWorkbenchNotice />
   const desktop = Boolean(getDesktopInvoke())
@@ -130,9 +133,9 @@ export default function Shell() {
       <div className={styles.shell}>
         <ServerRail />
         <div className={styles.content}>
-          {!localMode && <AccountClaimBanner />}
+          <AccountClaimBanner />
           <LocalModeBanner />
-          {!localMode && <NodeConnectBanner />}
+          {cloudAvailable && <NodeConnectBanner />}
           <div className={styles.body}>
             <main className={styles.routeFrame}>
               <Outlet />
@@ -140,7 +143,8 @@ export default function Shell() {
             {desktop && <ReaderWorkspace />}
           </div>
         </div>
-        {!localMode && <AppUpdateWatcher />}
+        {/* Cloud deployments cannot update packaged assets; the desktop updater owns those. */}
+        {!locallyHosted && <AppUpdateWatcher />}
       </div>
     </div>
   )

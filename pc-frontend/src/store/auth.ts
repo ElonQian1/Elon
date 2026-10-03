@@ -100,8 +100,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       fetchMe: async () => {
+        const startToken = _get().token
+        if (!startToken) return
         // /api/me 返回 { "user": {...} } 格式，需要取出内层 user
         const res = await api.get<{ user?: User }>('/api/me')
+        if (_get().token !== startToken) return
         const user = res?.user ?? (res as unknown as User)
         if (user?.id) set({ user })
         try {
@@ -109,7 +112,7 @@ export const useAuthStore = create<AuthState>()(
             '/api/auth/trust-current-device',
             {},
           )
-          if (trusted.expires_at) set({ expiresAt: trusted.expires_at })
+          if (_get().token === startToken && trusted.expires_at) set({ expiresAt: trusted.expires_at })
         } catch {
           // 兼容尚未发布该端点的旧服务端；用户仍保持当前有效登录。
         }

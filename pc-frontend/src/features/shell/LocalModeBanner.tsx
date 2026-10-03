@@ -1,159 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
-import { MonitorCheck, RefreshCw, WifiOff } from 'lucide-react'
+import { WifiOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { cloudBaseUrl, cloudConnectionProbeUrls, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
-import { listLocalTasks } from '../local-tasks/localTaskApi'
-import { pendingSyncCountFromList } from '../local-tasks/localTaskModel'
+import { useWorkbenchConnection } from './useWorkbenchConnection'
 import styles from './Shell.module.css'
 
-type CloudState = 'checking' | 'online' | 'offline'
-const CLOUD_FAILURE_THRESHOLD = 4
-const CLOUD_PROBE_INTERVAL_MS = 15_000
-const CLOUD_PROBE_TIMEOUT_MS = 8_000
-
-interface LocalStatus {
-  connected?: boolean
-  last_event?: string
-  cloud_http_url?: string
-}
-
+/** Connectivity is a recoverable state of the same workbench, never another home page. */
 export default function LocalModeBanner() {
-  const [cloudState, setCloudState] = useState<CloudState>('checking')
-  const cloudFailureCountRef = useRef(0)
-  const cloudProbeInFlightRef = useRef(false)
-  const [localStatus, setLocalStatus] = useState<LocalStatus | null>(null)
-  const [pendingSyncCount, setPendingSyncCount] = useState(0)
-  const localMode = isLocalWorkbench()
-
-  useEffect(() => {
-    let cancelled = false
-    async function refresh() {
-      if (cloudProbeInFlightRef.current) return
-      cloudProbeInFlightRef.current = true
-      if (!localMode) {
-        const cloudOk = await probeCloudConnection()
-        cloudProbeInFlightRef.current = false
-        if (cancelled) return
-        if (cloudOk) {
-          cloudFailureCountRef.current = 0
-          setCloudState('online')
-        } else {
-          cloudFailureCountRef.current += 1
-          if (cloudFailureCountRef.current >= CLOUD_FAILURE_THRESHOLD) setCloudState('offline')
-        }
-        setLocalStatus(null)
-        return
-      }
-      const [cloudOk, status, localTasks] = await Promise.all([
-        probeCloudConnection(),
-        probeLocalStatus(),
-        listLocalTasks(50).catch(() => null),
-      ])
-      cloudProbeInFlightRef.current = false
-      if (cancelled) return
-      if (cloudOk) {
-        cloudFailureCountRef.current = 0
-        setCloudState('online')
-      } else {
-        cloudFailureCountRef.current += 1
-        if (cloudFailureCountRef.current >= CLOUD_FAILURE_THRESHOLD) setCloudState('offline')
-      }
-      setLocalStatus(status)
-      setPendingSyncCount(localTasks ? pendingSyncCountFromList(localTasks) : 0)
-    }
-    refresh()
-    const timer = setInterval(refresh, CLOUD_PROBE_INTERVAL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [localMode])
-
-  if (!localMode) {
-    // Cloud-mode requests own their recovery UI. Do not put a global offline
-    // banner above the workbench for a transient probe failure; it shifts the
-    // layout and makes a recoverable stream look like a hard disconnect.
-    return null
-  }
-
-  const nodeConnected = localStatus?.connected !== false
-  const bannerClass = [
-    styles.nodeBanner,
-    cloudState === 'offline' ? styles.localModeOffline : styles.localModeBanner,
-  ].join(' ')
-  const Icon = cloudState === 'offline' ? WifiOff : cloudState === 'checking' ? RefreshCw : MonitorCheck
-  const cloudHost = hostLabel(localStatus?.cloud_http_url || cloudBaseUrl())
-  const copy = cloudState === 'offline'
-    ? `本地模式 · 工作台由这台电脑提供，云端 ${cloudHost} 暂时不可达；任务不会因此中断。`
-    : cloudState === 'checking'
-      ? '本地模式 · 正在确认云端连接…'
-      : nodeConnected
-        ? `本地模式 · 本机节点正常，云端 ${cloudHost} 已恢复；由你决定何时返回云端。`
-        : `本地模式 · 本机工作台正常，正在等待云端 ${cloudHost} 恢复连接。`
-
+  const { cloudState, checking, retry } = useWorkbenchConnection()
+  if (cloudState !== 'offline') return null
   return (
-    <div className={bannerClass}>
-      <Icon className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
-      <span title={localStatus?.last_event || copy}>{copy}</span>
-      <Link to="/local-tasks">
-        本机任务{pendingSyncCount > 0 ? ` · 待同步 ${pendingSyncCount}` : ''}
-      </Link>
-      {cloudState === 'online' && <a href={cloudWorkbenchUrl()}>返回云端工作台</a>}
+    <div className={`${styles.nodeBanner} ${styles.localModeOffline}`} role="status">
+      <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
+      <span>暂时无法连接云端，已打开的内容会保留。本机和 AI 功能以当前可用状态为准。</span>
+      <button type="button" onClick={retry} disabled={checking}>
+        {checking ? '正在重试…' : '重试连接'}
+      </button>
+      <Link to="/node">连接与设备</Link>
     </div>
   )
-}
-
-async function probeCloudConnection(): Promise<boolean> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), CLOUD_PROBE_TIMEOUT_MS)
-  try {
-    const probeUrls = cloudConnectionProbeUrls().map((url) => {
-      const probeUrl = new URL(url)
-      probeUrl.searchParams.set('probe', String(Date.now()))
-      return probeUrl.toString()
-    })
-    const results = await Promise.all(probeUrls.map(async (url) => {
-      try {
-        const res = await fetch(url, {
-          cache: 'no-store',
-          credentials: 'same-origin',
-          headers: { Accept: 'application/json, text/plain' },
-          signal: ctrl.signal,
-        })
-        return res.ok
-      } catch {
-        return false
-      }
-    }))
-    return results.some(Boolean)
-  } catch {
-    return false
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-async function probeLocalStatus(): Promise<LocalStatus | null> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 2000)
-  try {
-    const res = await fetch(localNodeUrl('/api/status'), {
-      cache: 'no-store',
-      signal: ctrl.signal,
-    })
-    if (!res.ok) return null
-    return await res.json() as LocalStatus
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-function hostLabel(raw: string): string {
-  try {
-    return new URL(raw).host
-  } catch {
-    return raw
-  }
 }

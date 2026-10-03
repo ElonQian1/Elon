@@ -1,8 +1,8 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { Navigate, Routes, Route } from 'react-router-dom'
+import { Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import Shell from './features/shell/Shell'
 import ComputeWorkspaceLayout from './features/compute/ComputeWorkspaceLayout'
-import { isLocalWorkbench } from './api/runtime'
+import { workbenchHomeRoute } from './features/shell/workbenchEntry'
 import styles from './App.module.css'
 
 const LoginPage = lazy(() => import('./features/auth/LoginPage'))
@@ -71,6 +71,7 @@ function lazyRoute(element: ReactNode) {
 }
 
 export default function App() {
+  const { search } = useLocation()
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('ui_preview') === 'esk-asset') {
     return <main className={styles.uiPreviewSurface}>{lazyRoute(<EskAssetPreview />)}</main>
   }
@@ -94,7 +95,6 @@ export default function App() {
       </main>
     )
   }
-  const defaultPath = isLocalWorkbench() ? '/local-tasks' : '/ai'
   return (
     <Routes>
       <Route path="/login" element={lazyRoute(<LoginPage />)} />
@@ -103,7 +103,7 @@ export default function App() {
       <Route path="/esk-compute" element={lazyRoute(<EskComputePage />)} />
       <Route path="/*" element={<Shell />}>
         {/* 首页：一龙 AI 工作台 */}
-        <Route index element={<Navigate to={defaultPath} replace />} />
+        <Route index element={<Navigate to={workbenchHomeRoute(search)} replace />} />
         <Route path="ai" element={lazyRoute(<AiHomePage />)} />
         <Route path="ai-work-summary" element={lazyRoute(<AiWorkSummaryPage />)} />
         <Route path="workspace" element={lazyRoute(<ConversationPage />)} />

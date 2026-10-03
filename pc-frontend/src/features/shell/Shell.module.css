@@ -74,7 +74,8 @@
   white-space: nowrap;
 }
 
-.claimBanner button {
+.claimBanner button,
+.claimBanner a {
   flex: 0 0 auto;
   height: 26px;
   padding: 0 14px;
@@ -85,6 +86,9 @@
   font-size: 12px;
   font-weight: 800;
   transition: background var(--transition), border-color var(--transition);
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .claimBanner button:hover,
@@ -94,6 +98,7 @@
 }
 
 .nodeBanner {
+  flex-wrap: wrap;
   min-height: 28px;
   display: inline-flex;
   align-items: center;
@@ -113,7 +118,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .nodeBanner a {
@@ -127,6 +132,22 @@
 
 .nodeBannerIcon {
   flex: 0 0 auto;
+}
+
+.nodeBanner button {
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  padding: 3px 8px;
+  font: inherit;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.nodeBanner button:disabled {
+  opacity: .65;
+  cursor: wait;
 }
 
 .nodeBannerConnecting {

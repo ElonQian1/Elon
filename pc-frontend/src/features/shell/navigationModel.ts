@@ -78,14 +78,6 @@ export const ADMIN_RAIL_ITEM: RailItem = {
   ...colors.gold,
 }
 
-export const LOCAL_RAIL_ITEMS: RailItem[] = [
-  { path: '/local-tasks', Icon: HardDrive, label: '本机任务', workspace: 'projects', ...colors.green },
-  { path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台', workspace: 'projects', ...colors.green },
-  { path: '/browser-research', Icon: Globe2, label: '浏览器研究', workspace: 'projects', ...colors.green },
-  { path: '/ai', Icon: Bot, label: '一龙 AI', workspace: 'ai', ...colors.green },
-  { path: '/user-browser', Icon: Globe2, label: '官方 AI', workspace: 'ai', ...colors.green },
-]
-
 const aiSections: NavSection[] = [
   {
     id: 'ai-conversations',
@@ -125,7 +117,7 @@ const projectSections: NavSection[] = [
   },
   {
     id: 'project-development',
-    label: '开发',
+    label: '开发工具',
     items: [
       { path: '/git-worktrees', Icon: GitBranch, label: 'Git 现场' },
       { path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台' },

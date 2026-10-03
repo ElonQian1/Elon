@@ -28176,6 +28176,264 @@
       "updated_at_ms": 1787450588560
     },
     {
+      "id": "win-consumer-workbench-entry-v1",
+      "title": "Windows 消费者工作台入口与恢复 V1",
+      "summary": "统一 Windows 本机与云端工作台默认 /ai 入口，按真实连接和登录状态启用服务，原地恢复断网能力，开发工具降层且保持全站用户默认展开。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-consumer-workbench-entry-v1.md",
+        "content_hash": "70c860c14c1f7aea548f74922cc8decadd539f79074ae299ffe174082897e69f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "57cedaa186317edff5344464a093a6c4fd1ec336",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-consumer-workbench",
+      "tags": [
+        "win",
+        "consumer",
+        "workbench",
+        "navigation",
+        "recovery"
+      ],
+      "task_paths": [
+        "pc-frontend/scripts/test-local-ai-browser-contract.cjs",
+        "pc-frontend/scripts/test-local-tasks.cjs",
+        "pc-frontend/src/App.tsx",
+        "pc-frontend/src/api/runtime.ts",
+        "pc-frontend/src/features/auth",
+        "pc-frontend/src/features/shell",
+        "scripts/node-agent-launcher/node-agent.env.example"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "根路由、默认登录回跳和异常返回指向 /ai，明确业务深链继续可用。",
+        "本机托管不关闭正常云端账号、通知、在线状态和项目服务；按实际连接与身份降级。",
+        "断网恢复原地启用服务并保留会话和草稿，不强制切站点或开发首页。",
+        "全站用户保持默认展开；生产 AI 工作台及现有功能复用，开发和诊断能力可发现。",
+        "定向回归、typecheck、lint、build通过，发布后分别报告节点和桌面精确版本及现场功能验证。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "pc-frontend/scripts/test-ai-directory-recovery.cjs",
+          "content_hash": "45270b54d11f82ef7ea31b0f6daec964c353db42e6b9841d119cdc5229bcc44d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "79b60470e35123873f0fdfcb2bf0e21b255631f3",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-consumer-entry.cjs",
+          "content_hash": "fcca2190f176a700e331ac376df5032726ead5ade8050c308d8feba92e4eb8d1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "979b6cd76cefde95557d4616be640af77f522223",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-consumer-navigation.cjs",
+          "content_hash": "4105a4d1f90b0eee8a35c511fb2e2349e602dbea11485aa28efe10c1ea5e3ead",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6c6fddf614bc5cf712aa0336bf5501edf6fce810",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-local-tasks.cjs",
+          "content_hash": "20c0888b322627962b83c220d9966e1d36c8c919d85abb371d2be989df36da22",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "f4f148199438e62178955b51c60e0fdaa53a233a",
+            "worktree_blob_oid": "1a129f9fd3a50cfc1f27f8f5e9ce2fd79d250a93",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-win-route-error-boundary.cjs",
+          "content_hash": "95035ddf9f4d5b26b2765d4efe67cdafff733ee4e0d01f94ba132854e1e1ab9c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "00414c2572cdce7ac5191dd2d0fe225c6583e2ab",
+            "worktree_blob_oid": "daee0b517153a4711bc7db821ba25cdde1b65f9e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-workbench-connection.cjs",
+          "content_hash": "2311180df7b3a74ba6337e6b0dc1ff08913a6da30fdfeee17bf22df8b8af69b0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "633e190914afa5953d5c486117e0b575a5681dad",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/App.tsx",
+          "content_hash": "6b4fb79eeaa64968cd7baf73cbd8721bfc36adaaa1df0d4d614b30f4d65dbcdf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "309840eaa40fbfb5e390100c8b0e1fd7f818cbd8",
+            "worktree_blob_oid": "bd3386aebe1d35703ad3605971592d13ab814138",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/WorkbenchErrorBoundary.tsx",
+          "content_hash": "90347fbc11eca3559ae824a253b87708e24c633c96bd1ce7458a811b2353395b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "3c364adc0537dfe00f031d2bd9d14dfcf6257f02",
+            "worktree_blob_oid": "26c5057875252e5730ff46606895bd8d6697a3c7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/api/runtime.ts",
+          "content_hash": "a584b86d472228f8a4b8c502857d3f4e3117425837c2add05f8983f3fe2dceaa",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "5784aa5870f04bcd403d179a039b4ec77d616c68",
+            "worktree_blob_oid": "b26d0e932ed4d5faad799fd8c3a62f1495a3150a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/ai/AiChatPage.tsx",
+          "content_hash": "6e5d10f2298eecad1733ea1324504df1462cc3d34e4a4b2f3ba642e58389635d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "4d3d2460881642c53782c8e733cf0a870163c76f",
+            "worktree_blob_oid": "b4cd6bcbdffedc5b294b7e65bdd36764bdf67f97",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/shell/LocalModeBanner.tsx",
+          "content_hash": "a0d528d7570ea7fc32f9b8d43391ee9fbac11c450ca5b1b26e1f028f8ab0bc79",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "dfb2fdf61387a257406a0d86ccc415a06c9d9fa6",
+            "worktree_blob_oid": "aca5da2428278ed83e7a634b6fbd73620f8cefa1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/shell/ServerRail.tsx",
+          "content_hash": "4446ae5d48de77ef8573c14dfb39acd6fe05f0788024d3726bb85cc90bc3424a",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "e0f821a0bb4618f8b6bf2da3547220073691eb15",
+            "worktree_blob_oid": "f78f7228d0b20570a5c43927f9de9173abe23d7a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/shell/Shell.tsx",
+          "content_hash": "fc25f668880532e38d2b0e55a883cfe97e5e6dcbcabb453d663b914cb3c95635",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "73c738f485c67bac54168b7da5f4d1e49f08d3c8",
+            "worktree_blob_oid": "5facb3336b70e39c71a45cec7dbfba68a16b22ac",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/shell/useWorkbenchConnection.ts",
+          "content_hash": "a6b1e5fd9fee26d01a1aa516cf8911a4eb1a89b5a537b753970f4abd40ff3dcc",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3da5eeed12264c018de5c2991954095bd52b9de5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/shell/workbenchConnectionModel.ts",
+          "content_hash": "a54a4be418f7bbe53eb8a59a49ead5d2d75f8a175dddb3044d28d995c805fabe",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "31003dc4f637b9779a2fd740257d08f9ac78f96c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/store/auth.ts",
+          "content_hash": "b10e65150357fa99b958dc79778f8f0c71aed7d0f805959c2dee94a6ef1cac6e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5145b8df5639fb97b6af46d9a1d0e6123fa3d41e",
+            "head_blob_oid": "b2b8e8926c02bde26868fcf069d8f753a4b262df",
+            "worktree_blob_oid": "7ffdb8cc5cc5c624b7f1b466c0362ad59f623f13",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1791020889638,
+      "updated_at_ms": 1791022043423
+    },
+    {
       "id": "win-control-already-current-update-noop-v1",
       "title": "Win 控制层同版本更新 No-op v1",
       "summary": "精确更新目标等于当前 release identity 时在语义控制层直接形成可查询成功终态，避免 Tauri 桌面壳无意义重启。",
@@ -33753,66 +34011,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_00f07ab636c346368997deadd8a75f4e",
-      "feature_id": "okx-account-balance-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1790014180746
-    },
-    {
-      "id": "feature_event_30c218a7e8d8401792d244488b57f8a8",
-      "feature_id": "personal-web-conversation-reader-v1",
-      "action": "registered",
-      "actor": "codex-conversation-reader",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1790234154170
-    },
-    {
-      "id": "feature_event_adbff7f40ea34a43955adebf23872180",
-      "feature_id": "personal-web-conversation-reader-v1",
-      "action": "claimed",
-      "actor": "codex-conversation-reader",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1790234154262
-    },
-    {
-      "id": "feature_event_01eaeef2c7fd4fbf952dcb31ac33306c",
-      "feature_id": "personal-web-conversation-reader-v1",
-      "action": "transitioned",
-      "actor": "codex-conversation-reader",
-      "reason": "Implementing scoped reader and validating Win/APK adapters",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1790235487897
-    },
-    {
-      "id": "feature_event_dce7a852dbb24b7182801d42f01101bf",
-      "feature_id": "personal-web-conversation-reader-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-conversation-reader",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1790236013106
-    },
-    {
-      "id": "feature_event_2a9656abd0b74974a26a4b7cc4f26910",
-      "feature_id": "personal-web-conversation-reader-v1",
-      "action": "transitioned",
-      "actor": "codex-conversation-reader",
-      "reason": "Scoped reader and both native adapters implemented; offline tests pass; release and live acceptance tracked separately",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1790236013213
-    },
-    {
       "id": "feature_event_5507fec4e89a402197fe70d06a52e283",
       "feature_id": "personal-web-conversation-reader-v1",
       "action": "transitioned",
@@ -35751,6 +35949,66 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790965256245
+    },
+    {
+      "id": "feature_event_6b3a3637308341528442f03e65fdde86",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "registered",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "用户已授权按消费者客户端方案重构，明确全站用户默认展开。新合同覆盖旧本机任务默认入口决定，保留旧feature发布历史。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1791020889638
+    },
+    {
+      "id": "feature_event_0739f35472414dbd8e0b1f8a748ca966",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "claimed",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1791020923943
+    },
+    {
+      "id": "feature_event_c161f91c3ffe4c29b83d77af55b7e0fa",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "按用户授权并行实现消费者默认入口、能力状态分离与开发工具分层，保留全站用户默认展开。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1791020942987
+    },
+    {
+      "id": "feature_event_8937f2c38e0d4046ba8b1e18cf32f786",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1791021998623
+    },
+    {
+      "id": "feature_event_9bd685fa25ec4318871a08744bc3cc36",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "统一消费者入口、连接状态、原地恢复和开发工具分层已实现；全站用户默认展开。绑定10条当前源码与6条测试证据。未宣称真实Tauri或发布完成。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1791022016069
+    },
+    {
+      "id": "feature_event_fefcdb1d29f74eca8963d566d9de651d",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "当前14项实际hook/Shell/auth行为测试通过；消费者入口、12种导航组合、目录恢复、本机任务和错误返回回归通过。typecheck及生产构建曾通过，但最终Shell仅online刷新guard晚于该构建；最终字节由正式发布重构建验证，不复用旧构建冒充。lint仅变更范围通过；真实Tauri安装、断网和崩溃现场尚未验收，未发布。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1791022043423
     }
   ]
 }

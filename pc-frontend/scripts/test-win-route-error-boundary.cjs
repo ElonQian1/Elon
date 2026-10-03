@@ -12,6 +12,7 @@ assert.match(boundary, /static getDerivedStateFromError/)
 assert.match(boundary, /componentDidCatch/)
 assert.match(boundary, /已阻止整窗黑屏/)
 assert.match(boundary, /window\.location\.reload\(\)/)
-assert.match(boundary, /window\.location\.assign\(window\.location\.pathname\.startsWith\('\/pc'\) \? '\/pc\/local-tasks' : '\/'\)/)
+assert.match(boundary, /window\.location\.assign\(workbenchHomeHref\(window\.location\.pathname, window\.location\.search\)\)/)
+assert.match(boundary, /返回 AI 工作台/)
 
 process.stdout.write('PASS Win route error boundary contract\n')

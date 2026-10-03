@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Folder } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
+import { useWorkbenchConnection } from '../shell/useWorkbenchConnection'
 import { useModelStore } from '../models/useModelStore'
 import { useProjectStore } from '../conversation/useProjectStore'
 import {
@@ -64,10 +65,10 @@ import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
 import { consumeStreamWithRecovery } from './aiStreamRecovery'
 import { remoteNodeId, remoteNodeName, pickRemoteCliNode, shouldRetryRemoteNodeExec, type RemoteNodeInfo } from './aiRemoteNodePolicy'
-
 export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; onModeChange: (mode: AiHomeMode) => void }) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const recoveryEpoch = useWorkbenchConnection((state) => state.recoveryEpoch)
   const localAiOwner = useLocalAiOwnerIdentity()
   const web = useAiWebChatBackend(mode, localAiOwner.ownerKey)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -200,8 +201,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
         setUsersLoading(false)
       })
     return () => { cancelled = true }
-  }, [user?.id])
-
+  }, [user?.id, recoveryEpoch])
   // ── 节点状态轮询（每 6s）──────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id) {

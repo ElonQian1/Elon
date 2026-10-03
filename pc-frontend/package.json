@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test:consumer-workbench": "node scripts/test-consumer-entry.cjs && node scripts/test-consumer-navigation.cjs && node scripts/test-ai-directory-recovery.cjs && node --test scripts/test-workbench-connection.cjs && node scripts/test-local-tasks.cjs && node scripts/test-win-route-error-boundary.cjs",
     "test:group-ai": "node --test scripts/test-group-ai-task.cjs scripts/test-group-ai-context.cjs scripts/test-group-ai-control.cjs scripts/test-group-ai-worker.cjs",
     "test:message-flow": "node ../scripts/test-pc-frontend-message-flow.js && node ../scripts/test-pc-frontend-task-result-tone.js && node ../scripts/test-pc-frontend-task-timeline-display.js && node ../scripts/test-pc-frontend-task-progress-preview.js && node ../scripts/test-pc-frontend-task-replay.js && node ../scripts/test-pc-frontend-task-recovery-snapshot.js",
     "test:workspace-access": "node ../scripts/test-pc-frontend-workspace-access.js && node ../scripts/test-pc-frontend-full-access-auto-grant.js",

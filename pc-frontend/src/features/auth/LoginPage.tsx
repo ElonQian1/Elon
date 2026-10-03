@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
 import type { ApiError } from '../../api/client'
 import { getPcLegacyUrl } from '../shell/pcLegacyUrl'
+import { workbenchHomeRoute } from '../shell/workbenchEntry'
 import GoogleIdentityButton from './GoogleIdentityButton'
 import PasswordRecoveryPanel from './PasswordRecoveryPanel'
 import styles from './LoginPage.module.css'
@@ -36,7 +37,7 @@ export default function LoginPage() {
       } else {
         await login(username, password)
       }
-      navigate('/', { replace: true })
+      navigate(workbenchHomeRoute(window.location.search), { replace: true })
     } catch (err) {
       setError((err as ApiError).message ?? (mode === 'register' ? '注册失败，请重试' : '登录失败，请重试'))
     } finally {
@@ -95,7 +96,7 @@ export default function LoginPage() {
               onComplete={(result) => {
                 if (!result.session) throw new Error('服务端没有创建登录会话')
                 acceptSession(result.session.token, result.session.expires_at, result.user)
-                navigate('/', { replace: true })
+                navigate(workbenchHomeRoute(window.location.search), { replace: true })
               }}
             />
           </>
