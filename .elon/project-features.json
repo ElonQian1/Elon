@@ -28179,7 +28179,7 @@
       "id": "win-consumer-workbench-entry-v1",
       "title": "Windows 消费者工作台入口与恢复 V1",
       "summary": "统一 Windows 本机与云端工作台默认 /ai 入口，按真实连接和登录状态启用服务，原地恢复断网能力，开发工具降层且保持全站用户默认展开。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-consumer-workbench-entry-v1.md",
@@ -28431,7 +28431,7 @@
         }
       ],
       "created_at_ms": 1791020889638,
-      "updated_at_ms": 1791022043423
+      "updated_at_ms": 1791024700633
     },
     {
       "id": "win-control-already-current-update-noop-v1",
@@ -34011,16 +34011,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5507fec4e89a402197fe70d06a52e283",
-      "feature_id": "personal-web-conversation-reader-v1",
-      "action": "transitioned",
-      "actor": "codex-win-reader",
-      "reason": "User requested Codex integration, Win cold start, and actual account reading acceptance.",
-      "from_status": "implemented",
-      "to_status": "ready",
-      "at_ms": 1790261762793
-    },
-    {
       "id": "feature_event_3f698a5391fe4dbdae9d941375e6b377",
       "feature_id": "personal-web-conversation-reader-v1",
       "action": "requirement_rebound",
@@ -36009,6 +35999,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1791022043423
+    },
+    {
+      "id": "feature_event_e983663f8d524a9aa55c6a86b6577bdf",
+      "feature_id": "win-consumer-workbench-entry-v1",
+      "action": "transitioned",
+      "actor": "codex-win-consumer-workbench",
+      "reason": "发布源码2dc7d72e16b0f03d1c7a0b86899ae5475d177e40；云PC完成检查通过，Node0.3.69本机节点/桌面精确更新通过，远端outbox首试synced，安装产物HTTP200。无navigate启动与正式launcher重复打开均heartbeat /pc/ai且PID33480不变。源码NodeAgent收尾FINALIZABLE=true。详见docs/reports/win-consumer-workbench-entry-20261003.md；fixture断网非物理断网，未第三方登录/崩溃注入/native截图，保留既有catalog测试债务。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1791024700633
     }
   ]
 }
