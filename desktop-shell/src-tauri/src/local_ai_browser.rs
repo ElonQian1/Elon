@@ -27,6 +27,7 @@ mod conversation_scripts;
 pub(crate) mod embedded_view;
 #[path = "local_ai_browser/exchange_observation.rs"]
 pub(crate) mod exchange_observation;
+pub(crate) mod grid_device_transport;
 #[path = "local_ai_browser/exchange_webview.rs"]
 pub(crate) mod exchange_webview;
 #[path = "local_ai_browser/google_ai_mode.rs"]

@@ -154,6 +154,7 @@ fn main() {
             local_ai_browser::list_local_ai_web_providers,
             local_ai_browser::exchange_webview::list_exchange_web_providers,
             local_ai_browser::exchange_observation::get_exchange_web_observation,
+            local_ai_browser::grid_device_transport::grid_device_sources_request,
             local_ai_browser::exchange_observation::run_exchange_web_adapter_command,
             local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,

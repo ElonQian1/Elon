@@ -1,0 +1,12 @@
+.panel { display: grid; gap: 8px; color: var(--text-primary); min-width: 0; }
+.panel h3, .panel p { margin: 0; }
+.panel p, .panel small { overflow-wrap: anywhere; line-height: 1.5; }
+.controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.controls label, .sync { display: flex; align-items: center; gap: 8px; min-height: 48px; cursor: pointer; }
+.panel input { width: 18px; height: 18px; }
+.panel button { min-height: 48px; padding: 8px 16px; cursor: pointer; }
+.panel button:disabled { cursor: default; opacity: .6; }
+.panel :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.source { padding-block: 8px; border-bottom: 1px solid var(--border-color); }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rows li { display: grid; gap: 4px; padding: 12px; background: var(--bg-secondary); border-radius: 12px; overflow-wrap: anywhere; }

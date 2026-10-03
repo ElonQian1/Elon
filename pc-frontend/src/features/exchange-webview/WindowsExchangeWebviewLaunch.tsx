@@ -9,6 +9,7 @@ import {
 } from './exchangeWebviewApi'
 import { exchangeWebviewErrorMessage } from './exchangeWebviewErrors.js'
 import ExchangeObservationSummary from './ExchangeObservationSummary'
+import GridDeviceSourcesPanel from '../grid-sources/GridDeviceSourcesPanel'
 import styles from './WindowsExchangeWebviewLaunch.module.css'
 
 export interface WindowsWebviewLaunchContract {
@@ -69,6 +70,8 @@ export default function WindowsExchangeWebviewLaunch({
         {message && <p className={styles.success} role="status">{message}</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         {observing && identity.ownerKey && <ExchangeObservationSummary providerId={launch.provider_id} ownerKey={identity.ownerKey} />}
+        {desktop && launch.provider_id === 'binance' && identity.source === 'cloud_account' &&
+          <GridDeviceSourcesPanel key={identity.ownerKey} ownerKey={identity.ownerKey} />}
       </div>
       <button type="button" disabled={disabled} onClick={() => void open()}>
         {opening ? <Loader2 className={styles.spinner} size={15} aria-hidden="true" /> : <ExternalLink size={15} aria-hidden="true" />}
