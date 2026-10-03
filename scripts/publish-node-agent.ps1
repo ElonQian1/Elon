@@ -63,6 +63,8 @@ $WindowsClientPackageName = "elon-node-agent-windows.zip"
 $WindowsInstallerPackageName = "elon-node-agent-windows-setup.exe"
 $RipgrepPackageName = "ripgrep-windows.zip"
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+& node (Join-Path $RepoRoot 'scripts/check-webview-layout.cjs')
+if ($LASTEXITCODE -ne 0) { throw 'WebView layout ownership check failed.' }
 $ServerDir = Join-Path $RepoRoot "server"
 $ServerManifest = Join-Path $ServerDir "Cargo.toml"
 $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"

@@ -1,4 +1,10 @@
 fn main() {
+    // Tauri embeds its Windows resources only in application binaries. Native
+    // regression examples also need Common Controls v6 (TaskDialogIndirect).
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        println!("cargo:rustc-link-arg-examples=/MANIFEST:EMBED");
+        println!("cargo:rustc-link-arg-examples=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'");
+    }
     // The running shell must identify its own binary, never the node or a disk manifest.
     println!("cargo:rerun-if-env-changed=ELON_DESKTOP_RELEASE_IDENTITY");
     if let Ok(identity) = std::env::var("ELON_DESKTOP_RELEASE_IDENTITY") {

@@ -18,6 +18,7 @@ if ! elon_resolve_hook_powershell; then
 fi
 
 git diff --cached --check
+node scripts/check-webview-layout.cjs --staged
 elon_run_hook_powershell \
   -File scripts/check-document-modularity.ps1 \
   -BaseRef HEAD \
