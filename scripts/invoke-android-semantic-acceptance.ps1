@@ -3,10 +3,11 @@
 function Invoke-AndroidSemanticAcceptance {
     param(
         [Parameter(Mandatory)]$Runtime,
-        [Parameter(Mandatory)][ValidateSet('LibraryUiAcceptance','ConversationUiAcceptance','AttachmentPickerUiAcceptance','SharedLinkUiAcceptance','SocialLinkUiAcceptance','CanvasUiAcceptance','TextBlockUiAcceptance','DirectoryUiAcceptance','GroupAiUiAcceptance','ChatRecordUiAcceptance','ImageViewerUiAcceptance')][string]$TestClass,
+        [Parameter(Mandatory)][ValidateSet('LibraryUiAcceptance','ConversationUiAcceptance','AttachmentPickerUiAcceptance','SharedLinkUiAcceptance','SocialLinkUiAcceptance','SocialMediaReturnAcceptance','CanvasUiAcceptance','TextBlockUiAcceptance','DirectoryUiAcceptance','GroupAiUiAcceptance','ChatRecordUiAcceptance','ImageViewerUiAcceptance')][string]$TestClass,
         [Parameter(Mandatory)][string]$Step,
         [hashtable]$Parameters = @{},
-        [Parameter(Mandatory)][ValidateSet('LIBRARY_UI_RESULT','CONVERSATION_UI_RESULT','ATTACHMENT_PICKER_UI_RESULT','SHARED_LINK_UI_RESULT','SOCIAL_LINK_UI_RESULT','CANVAS_UI_RESULT','TEXT_BLOCK_UI_RESULT','DIRECTORY_UI_RESULT','GROUP_AI_UI_RESULT','CHAT_RECORD_UI_RESULT','IMAGE_VIEWER_UI_RESULT')][string]$ResultPrefix,
+        [ValidateRange(10, 60)][int]$TimeoutSeconds = 40,
+        [Parameter(Mandatory)][ValidateSet('LIBRARY_UI_RESULT','CONVERSATION_UI_RESULT','ATTACHMENT_PICKER_UI_RESULT','SHARED_LINK_UI_RESULT','SOCIAL_LINK_UI_RESULT','SOCIAL_MEDIA_RETURN_RESULT','CANVAS_UI_RESULT','TEXT_BLOCK_UI_RESULT','DIRECTORY_UI_RESULT','GROUP_AI_UI_RESULT','CHAT_RECORD_UI_RESULT','IMAGE_VIEWER_UI_RESULT')][string]$ResultPrefix,
         [string]$SdkRoot = 'D:/Android/sdk',
         [string]$JavaHome = 'C:/Program Files/Microsoft/jdk-21.0.11.10-hotspot'
     )
@@ -45,7 +46,7 @@ function Invoke-AndroidSemanticAcceptance {
         $arguments = @('shell','uiautomator','runtest',$remote,'-s','-c',"com.elon.acceptance.$TestClass",'-e','step',$Step)
         foreach ($entry in $Parameters.GetEnumerator()) { $arguments += @('-e',[string]$entry.Key,[string]$entry.Value) }
         $raw = Invoke-ChatGptWebSmokeAdb -Runtime $Runtime -Arguments $arguments `
-            -TimeoutSec 40 -Label 'run semantic UI action'
+            -TimeoutSec $TimeoutSeconds -Label 'run semantic UI action'
         if ($raw -notmatch 'OK \(1 test\)' -or $raw -match 'FAILURES!!!|INSTRUMENTATION_FAILED|run aborted|shortMsg=') {
             $code = [regex]::Match($raw, '(?m)(?:AssertionFailedError|AssertionError|ComparisonFailure): ([a-z_]+)').Groups[1].Value
             if (-not $code) { $code = [regex]::Match($raw, '(?m)\b([A-Za-z][A-Za-z0-9_.]*(?:Exception|Error))\b').Groups[1].Value }
