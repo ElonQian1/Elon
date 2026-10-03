@@ -1,8 +1,9 @@
 .avatarImage { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .attachments { display: flex; flex-direction: column; gap: 8px; max-width: 100%; margin-top: 4px; }
 .attachments:empty { display: none; }
-.imageButton { display: block; align-self: flex-start; padding: 0; border: 0; border-radius: 10px; background: #30323a; overflow: hidden; cursor: zoom-in; max-width: 100%; }
-.image { display: block; max-width: min(320px, 100%); max-height: 300px; min-width: 80px; min-height: 60px; object-fit: contain; }
+/* An absolute image cap keeps intrinsic button sizing out of percentage-width cycles. */
+.imageButton { display: flex; align-items: flex-start; align-self: flex-start; width: fit-content; max-width: 100%; padding: 0; border: 0; border-radius: 10px; background: transparent; overflow: hidden; cursor: zoom-in; }
+.image { display: block; min-width: 0; width: auto; height: auto; max-width: 320px; max-height: 300px; }
 .audio { padding: 10px 12px; border: 1px solid rgba(46,168,97,.32); border-radius: 10px; background: rgba(46,168,97,.12); max-width: 100%; color: var(--text, #eee); }
 .audio strong { display: block; font-size: 13px; margin-bottom: 6px; }
 .audio audio { display: block; width: 280px; max-width: 100%; height: 42px; }
