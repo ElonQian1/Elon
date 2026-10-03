@@ -56,7 +56,7 @@ Android 同时接收 `ACTION_SEND` 和 `ACTION_SEND_MULTIPLE` 的 ZIP。实际�
 
 Android 二次打开采用 [近期缓存先显示与本地管理](reports/wechat-record-cache-reopen-20260929.md)：5 分钟验证窗口、正文与媒体分队列、关闭即取消、128 MiB/7 天回收及手动清理。该策略替代旧报告中 Android 每次等待网络复核的规则。
 
-PC/Win 使用 [附件本地缓存](reports/win-record-media-cache-20261003.md)：正文每次复核权限，附件复用 32 MiB 内存与 128 MiB/7 天磁盘缓存；嵌套返回和重开不重复下载，更多菜单可清理本条缓存。PWA 保留 HTTP 条件缓存策略。
+PC/Win 使用 [附件本地缓存](reports/win-record-media-cache-20261003.md) 与 [正文近期缓存先显示](reports/win-record-reopen-latency-20261003.md)：最近 5 分钟验证过的正文先显示，再后台复核；过期先核验。附件复用 32 MiB 内存与 128 MiB/7 天磁盘缓存；更多菜单可清理本条缓存。PWA 保留 HTTP 条件缓存策略。
 
 头像、导出标签折叠、卡片复制/转发和视频缩略图见 [阅读体验与验证](reports/wechat-record-reader-presentation-20260929.md)。这些是展示层规则，`raw_text` 和原始链接保持完整。
 

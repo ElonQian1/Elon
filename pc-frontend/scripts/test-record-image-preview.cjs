@@ -3,6 +3,7 @@ const assert = require('node:assert/strict')
 const path = require('node:path')
 const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
+const playwright = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const engine = process.env.BROWSER_ENGINE || 'chromium'
 const root = path.resolve(__dirname, '..')
 const card = { schema: 'chat_record_bundle_v1', record_id: 'record_test', group_id: 'group_test', title: '微信聊天记录', summary: 'fixture', message_count: 2, total_count: 3 }
@@ -30,7 +31,7 @@ async function main() {
   } }] })
   await server.listen()
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`
-  const browser = await require('playwright')[engine].launch({ headless: true, ...(engine === 'chromium' ? { channel: 'msedge' } : {}) })
+  const browser = await playwright[engine].launch({ headless: true, ...(engine === 'chromium' ? { channel: 'msedge' } : {}) })
   try {
     for (const width of [1280, 390]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } }), errors = []
